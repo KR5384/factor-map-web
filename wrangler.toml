@@ -1,0 +1,24 @@
+# Cloudflare Workers 設定: もやもや診断アプリ バックエンド API
+# 参照: design.md「Architecture」「API設計」
+name = "factor-map-api"
+main = "worker/index.ts"
+compatibility_date = "2025-01-01"
+
+# D1 データベースバインディング
+# database_id は `wrangler d1 create <name>` 実行後に発行される値へ差し替える
+[[d1_databases]]
+binding = "DB"
+database_name = "factor-map-db"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "worker/migrations"
+
+# 管理者機能 (F-19 / Requirements 21) の資格情報プレースホルダ。
+# 開発用のダミー値。本番では値をコミットせず、以下のいずれかで安全に設定する:
+#   wrangler secret put ADMIN_USER
+#   wrangler secret put ADMIN_PASSWORD
+#   wrangler secret put ADMIN_TOKEN
+# ユーザ名+パスワード認証、または単一トークン認証のいずれでも利用できる。
+[vars]
+ADMIN_USER = "admin"
+ADMIN_PASSWORD = "change-me-in-secrets"
+ADMIN_TOKEN = "change-me-in-secrets"

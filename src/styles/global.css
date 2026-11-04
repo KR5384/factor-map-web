@@ -1,0 +1,640 @@
+/**
+ * グローバルスタイル: もやもや診断アプリ
+ *
+ * 全画面 (View) に共通で適用するデザイン。各 View が出力する BEM クラス
+ * (view / button / survey / questions-view / factor / pre-survey / bubble など)
+ * をまとめてスタイリングする。コンポーネントの TS は変更せず、本 CSS のみで
+ * 見た目を統一する。
+ */
+
+/* ============================================================
+   デザイントークン
+   ============================================================ */
+:root {
+  /* カラー: もやもや→整理 を想起させる青緑系 */
+  --c-bg-start: #eef4f8;
+  --c-bg-end: #e6f0ef;
+  --c-surface: #ffffff;
+  --c-surface-muted: #f5f8fa;
+  --c-border: #dde5ea;
+  --c-text: #26323b;
+  --c-text-muted: #5f7180;
+  --c-primary: #2f8f83;
+  --c-primary-hover: #267a70;
+  --c-primary-soft: #e0f0ed;
+  --c-accent: #f0a23c;
+  --c-danger: #d6453e;
+  --c-danger-soft: #fdecea;
+  --c-focus: #4aa6d6;
+
+  /* タイポ */
+  --font-sans: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP",
+    "Yu Gothic", Meiryo, system-ui, -apple-system, sans-serif;
+
+  /* 形状・影 */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --shadow-sm: 0 1px 2px rgba(38, 50, 59, 0.06);
+  --shadow-md: 0 8px 24px rgba(38, 50, 59, 0.1);
+  --shadow-lg: 0 16px 48px rgba(38, 50, 59, 0.14);
+
+  /* レイアウト */
+  --maxw: 640px;
+  --space: 16px;
+}
+
+/* ============================================================
+   ベース
+   ============================================================ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--c-text);
+  line-height: 1.7;
+  background: linear-gradient(160deg, var(--c-bg-start), var(--c-bg-end));
+  background-attachment: fixed;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#app {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: clamp(20px, 5vw, 48px) clamp(16px, 4vw, 24px);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.35;
+  color: var(--c-text);
+}
+
+p {
+  margin: 0 0 0.75em;
+}
+
+/* ============================================================
+   画面カード (view 共通)
+   ============================================================ */
+.view,
+.questions-view,
+.result-view,
+.pre-survey {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: clamp(24px, 5vw, 40px);
+  width: 100%;
+  animation: view-in 0.35s ease both;
+}
+
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.view__title,
+.result-view__title,
+.pre-survey > h1,
+.questions-view__heading {
+  margin: 0 0 0.5em;
+  font-size: clamp(1.4rem, 4vw, 1.8rem);
+  letter-spacing: 0.01em;
+}
+
+.view__lead,
+.pre-survey > p {
+  color: var(--c-text-muted);
+  font-size: 1rem;
+  margin-bottom: 1.5em;
+}
+
+/* トップ画面のヒーロー感を少しだけ強調 */
+.view--top {
+  text-align: center;
+}
+.view--top .view__title {
+  font-size: clamp(1.8rem, 6vw, 2.4rem);
+}
+.view--top .view__title::before {
+  content: "";
+  display: block;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #7fd0c4, var(--c-primary));
+  box-shadow: var(--shadow-md);
+}
+
+/* ============================================================
+   ボタン
+   ============================================================ */
+.button,
+.questions-view__prev,
+.questions-view__next,
+.questions-view__diagnose,
+.result-view__next,
+.pre-survey__submit,
+.survey__form button[type="submit"] {
+  appearance: none;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: 12px 22px;
+  background: var(--c-primary);
+  color: #fff;
+  transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease,
+    opacity 0.15s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.button:hover,
+.questions-view__diagnose:hover,
+.result-view__next:hover,
+.pre-survey__submit:hover,
+.survey__form button[type="submit"]:hover {
+  background: var(--c-primary-hover);
+}
+
+.button:active,
+.questions-view__diagnose:active,
+.result-view__next:active,
+.pre-survey__submit:active {
+  transform: translateY(1px);
+}
+
+.button:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+.button--primary {
+  background: var(--c-primary);
+}
+
+.button--secondary {
+  background: var(--c-surface);
+  color: var(--c-primary);
+  border-color: var(--c-primary);
+  box-shadow: none;
+}
+.button--secondary:hover {
+  background: var(--c-primary-soft);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* 単独ボタンは下にまとめて余白を確保 */
+.view > .button,
+.result-view__next,
+.pre-survey__submit {
+  margin-top: 8px;
+}
+
+/* ============================================================
+   説明画面 (about)
+   ============================================================ */
+.about-section {
+  background: var(--c-surface-muted);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  margin-bottom: 14px;
+}
+.about-section__heading {
+  margin: 0 0 0.4em;
+  font-size: 1.1rem;
+  color: var(--c-primary-hover);
+}
+.about-section__body {
+  margin: 0;
+  color: var(--c-text-muted);
+}
+
+/* ============================================================
+   同意画面 (consent)
+   ============================================================ */
+.consent__explanation {
+  background: var(--c-surface-muted);
+  border-left: 4px solid var(--c-primary);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  color: var(--c-text-muted);
+}
+.consent__choices {
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px 16px;
+  margin: 0 0 18px;
+}
+.consent__legend {
+  font-weight: 600;
+  padding: 0 6px;
+}
+.consent__choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.consent__choice:hover {
+  background: var(--c-primary-soft);
+}
+.consent__choice input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--c-primary);
+}
+
+/* ============================================================
+   アンケート共通 (pre-survey / survey = post)
+   ============================================================ */
+.pre-survey,
+.view--post-survey .survey__form {
+  display: flex;
+  flex-direction: column;
+}
+
+fieldset.pre-survey__clarity,
+.survey__field {
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  margin: 0 0 18px;
+  background: var(--c-surface-muted);
+}
+
+.pre-survey__clarity legend,
+.survey__legend,
+.survey__label {
+  font-weight: 600;
+  color: var(--c-text);
+  padding: 0 4px;
+}
+
+/* 尺度 (1〜5) の選択肢を横並びのピル型に */
+.pre-survey__clarity,
+.survey__field[data-field="clarity"],
+.survey__field[data-field="conviction"] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.pre-survey__clarity legend,
+.survey__field[data-field="clarity"] .survey__legend,
+.survey__field[data-field="conviction"] .survey__legend {
+  flex-basis: 100%;
+  margin-bottom: 6px;
+}
+
+.pre-survey__clarity-option,
+.survey__scale-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--c-border);
+  border-radius: 999px;
+  background: var(--c-surface);
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+  min-width: 48px;
+  justify-content: center;
+}
+.pre-survey__clarity-option:hover,
+.survey__scale-option:hover {
+  border-color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
+.pre-survey__clarity-option input,
+.survey__scale-option input {
+  accent-color: var(--c-primary);
+}
+
+/* 自由記述 */
+.pre-survey__free-text,
+.survey__textarea {
+  width: 100%;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font: inherit;
+  resize: vertical;
+  min-height: 92px;
+  background: var(--c-surface);
+}
+
+/* バリデーション強調 (is-invalid / survey__field--invalid) */
+.is-invalid,
+.survey__field--invalid {
+  border-color: var(--c-danger) !important;
+  background: var(--c-danger-soft) !important;
+}
+
+.pre-survey__error {
+  color: var(--c-danger);
+  font-weight: 600;
+  margin: 4px 0 12px;
+}
+
+/* ============================================================
+   質問画面 (questions-view)
+   ============================================================ */
+.questions-view__progress {
+  margin-bottom: 18px;
+}
+.questions-view__progress-text {
+  margin: 0;
+  font-weight: 600;
+  color: var(--c-primary-hover);
+}
+/* 進捗ゲージ */
+.questions-view__progress-bar {
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: var(--c-border);
+  overflow: hidden;
+}
+.questions-view__progress-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #7fd0c4, var(--c-primary));
+  transition: width 0.25s ease;
+}
+
+.questions-view__question {
+  background: var(--c-surface-muted);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+  margin-bottom: 20px;
+}
+.questions-view__question--missing {
+  border-color: var(--c-danger);
+  background: var(--c-danger-soft);
+}
+.questions-view__heading {
+  margin: 0 0 14px;
+  font-size: 1.15rem;
+}
+
+.questions-view__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.questions-view__choice {
+  text-align: left;
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.questions-view__choice:hover {
+  border-color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
+.questions-view__choice--selected {
+  border-color: var(--c-primary);
+  background: var(--c-primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.questions-view__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+.questions-view__prev,
+.questions-view__next {
+  background: var(--c-surface);
+  color: var(--c-primary);
+  border-color: var(--c-primary);
+  box-shadow: none;
+}
+.questions-view__prev:hover,
+.questions-view__next:hover {
+  background: var(--c-primary-soft);
+}
+.questions-view__diagnose {
+  margin-left: auto;
+}
+.questions-view__notice {
+  color: var(--c-danger);
+  font-weight: 600;
+  background: var(--c-danger-soft);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin-top: 12px;
+}
+
+/* ============================================================
+   診断結果 (result-view / factor / bubble map)
+   ============================================================ */
+.result-view__map {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  margin: 8px 0 24px;
+  background: var(--c-surface-muted);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+.result-view__map svg,
+.moyamoya-map {
+  max-width: 100%;
+  height: auto;
+}
+
+/* バブル (SVG) */
+.bubble circle {
+  fill: var(--c-primary-soft);
+  stroke: var(--c-primary);
+  stroke-width: 2;
+  transition: fill 0.2s ease;
+}
+.bubble__label {
+  fill: var(--c-primary-hover);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+}
+.bubble--top circle {
+  fill: var(--c-accent);
+  stroke: #d2851f;
+}
+.bubble--top .bubble__label {
+  fill: #5a3c11;
+}
+
+/* 要因詳細リスト */
+.factor-details {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.factor {
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  background: var(--c-surface-muted);
+}
+.factor--top {
+  border-color: var(--c-accent);
+  background: #fff7ec;
+  box-shadow: 0 0 0 1px var(--c-accent) inset;
+}
+.factor__label {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.factor__top-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--c-accent);
+  border-radius: 999px;
+  padding: 2px 10px;
+  letter-spacing: 0.04em;
+}
+.factor__score {
+  margin: 0 0 8px;
+  font-weight: 600;
+  color: var(--c-primary-hover);
+}
+.factor__description {
+  margin: 0 0 10px;
+  color: var(--c-text-muted);
+}
+.factor__related-title {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--c-text);
+}
+.factor__related-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.factor__related-item {
+  font-size: 0.82rem;
+  background: var(--c-primary-soft);
+  color: var(--c-primary-hover);
+  border-radius: 999px;
+  padding: 4px 12px;
+}
+
+/* ============================================================
+   完了画面 (complete) / エラー
+   ============================================================ */
+.view--complete {
+  text-align: center;
+}
+.view--complete .view__title::before {
+  content: "✓";
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: var(--c-primary);
+  color: #fff;
+  font-size: 2rem;
+  box-shadow: var(--shadow-md);
+}
+
+.view--error {
+  border-color: var(--c-danger);
+}
+.view--error p {
+  color: var(--c-danger);
+  font-weight: 600;
+  margin: 0;
+}
+
+/* ============================================================
+   レスポンシブ微調整
+   ============================================================ */
+@media (max-width: 480px) {
+  .questions-view__controls {
+    flex-direction: column;
+  }
+  .questions-view__diagnose {
+    margin-left: 0;
+  }
+  .questions-view__prev,
+  .questions-view__next,
+  .questions-view__diagnose,
+  .button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view,
+  .questions-view,
+  .result-view,
+  .pre-survey {
+    animation: none;
+  }
+}

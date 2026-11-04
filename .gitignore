@@ -1,0 +1,14 @@
+# 依存・ビルド成果物
+node_modules
+dist
+.wrangler
+
+# OS / 一時ファイル
+*.local
+.DS_Store
+
+# エディタ個人設定
+.vscode
+
+# Kiro スペック・作業ドキュメント (アプリ実行には不要)
+.kiro
