@@ -1,24 +1,15 @@
-# Cloudflare Workers 設定: もやもや診断アプリ バックエンド API
-# 参照: design.md「Architecture」「API設計」
-name = "factor-map-api"
-main = "worker/index.ts"
+# Cloudflare Workers 設定: もやもや診断アプリ 画面配信 (静的アセット専用)
+# 参照: design.md「Architecture」
+# NOTE: API は factor-map-api (別リポジトリ / 別 Worker) に集約した (A案)。
+#       このリポジトリは Vite ビルド成果物 (dist) を配信する画面専用。
+name = "factor-map-web"
 compatibility_date = "2025-01-01"
 
-# D1 データベースバインディング
-# database_id は `wrangler d1 create <name>` 実行後に発行される値へ差し替える
-[[d1_databases]]
-binding = "DB"
-database_name = "factor-map-db"
-database_id = "edb14dc4-b47e-405c-8ec3-225f288a80a3"
-migrations_dir = "worker/migrations"
-
-# 管理者機能 (F-19 / Requirements 21) の資格情報プレースホルダ。
-# 開発用のダミー値。本番では値をコミットせず、以下のいずれかで安全に設定する:
-#   wrangler secret put ADMIN_USER
-#   wrangler secret put ADMIN_PASSWORD
-#   wrangler secret put ADMIN_TOKEN
-# ユーザ名+パスワード認証、または単一トークン認証のいずれでも利用できる。
-[vars]
-ADMIN_USER = "admin"
-ADMIN_PASSWORD = "change-me-in-secrets"
-ADMIN_TOKEN = "change-me-in-secrets"
+# 静的アセット配信 (画面表示用)。`npm run build` の出力先 dist を配信する。
+# この設定によりデプロイ時に has_assets = true となる。
+# - directory: Vite のビルド出力 (vite.config.ts の build.outDir と一致)
+# - not_found_handling: SPA 向けに未知パスは index.html へフォールバック
+# API を自前で持たないため run_worker_first は不要 (全リクエストをアセットで処理)。
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
