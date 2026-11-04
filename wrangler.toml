@@ -9,7 +9,7 @@ compatibility_date = "2025-01-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "factor-map-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "edb14dc4-b47e-405c-8ec3-225f288a80a3"
 migrations_dir = "worker/migrations"
 
 # 管理者機能 (F-19 / Requirements 21) の資格情報プレースホルダ。
