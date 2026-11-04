@@ -2,10 +2,10 @@
 /**
  * Cloudflare Workers API: もやもや診断アプリ バックエンド
  *
- * 研究データ保存用の3つの POST エンドポイントを提供する。
- *   - POST /api/pre-survey   事前アンケート保存 (F-04 / Requirements 4.5, 4.6)
- *   - POST /api/diagnosis    診断結果保存     (F-11 / Requirements 9.7, 9.8)
- *   - POST /api/post-survey  事後アンケート保存 (F-14 / Requirements 12.5, 12.6)
+ * 研究データ保存用の3つの POST エンドポイントを提供する (API バージョン: v1)。
+ *   - POST /api/v1/surveys/pre        事前アンケート保存 (F-04 / Requirements 4.5, 4.6)
+ *   - POST /api/v1/factor-analyses    診断結果保存       (F-11 / Requirements 9.7, 9.8)
+ *   - POST /api/v1/surveys/post       事後アンケート保存 (F-14 / Requirements 12.5, 12.6)
  *
  * 参照: design.md「API設計」。D1 へ prepared statement で永続化する。
  *
@@ -181,7 +181,7 @@ async function sessionExists(env: Env, sessionId: string): Promise<boolean> {
 }
 
 // ============================================================
-// エンドポイント: POST /api/pre-survey (Requirements 4.5, 4.6)
+// エンドポイント: POST /api/v1/surveys/pre (Requirements 4.5, 4.6)
 // ============================================================
 
 async function handlePreSurvey(request: Request, env: Env): Promise<Response> {
@@ -235,7 +235,7 @@ async function handlePreSurvey(request: Request, env: Env): Promise<Response> {
 }
 
 // ============================================================
-// エンドポイント: POST /api/diagnosis (Requirements 9.7, 9.8)
+// エンドポイント: POST /api/v1/factor-analyses (Requirements 9.7, 9.8)
 // ============================================================
 
 async function handleDiagnosis(request: Request, env: Env): Promise<Response> {
@@ -286,7 +286,7 @@ async function handleDiagnosis(request: Request, env: Env): Promise<Response> {
 }
 
 // ============================================================
-// エンドポイント: POST /api/post-survey (Requirements 12.5, 12.6)
+// エンドポイント: POST /api/v1/surveys/post (Requirements 12.5, 12.6)
 // ============================================================
 
 async function handlePostSurvey(request: Request, env: Env): Promise<Response> {
@@ -783,11 +783,11 @@ export default {
 
     if (request.method === "POST") {
       switch (pathname) {
-        case "/api/pre-survey":
+        case "/api/v1/surveys/pre":
           return handlePreSurvey(request, env);
-        case "/api/diagnosis":
+        case "/api/v1/factor-analyses":
           return handleDiagnosis(request, env);
-        case "/api/post-survey":
+        case "/api/v1/surveys/post":
           return handlePostSurvey(request, env);
         case "/api/admin/login":
           return handleAdminLogin(request, env);

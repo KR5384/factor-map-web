@@ -35,11 +35,11 @@ export const DEFAULT_BASE_URL = "https://factor-map-api.east-10g.workers.dev";
 /** POST のタイムアウト (ミリ秒)。10 秒 (Req 15.1) */
 export const DEFAULT_TIMEOUT_MS = 10_000;
 
-/** エンドポイントパス */
+/** エンドポイントパス (API バージョン: v1) */
 export const ENDPOINTS = {
-  preSurvey: "/api/pre-survey",
-  diagnosis: "/api/diagnosis",
-  postSurvey: "/api/post-survey",
+  preSurvey: "/api/v1/surveys/pre",
+  diagnosis: "/api/v1/factor-analyses",
+  postSurvey: "/api/v1/surveys/post",
 } as const;
 
 // ============================================================
