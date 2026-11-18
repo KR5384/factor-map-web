@@ -1,53 +1,98 @@
 /**
- * SurveyStore: アンケート状態管理とバリデーション (F-04 事前 / F-14 事後)
+ * アンケートの設問定義と入力チェック (事前 F-04 / 事後 F-14)
  *
- * 事前/事後アンケートの入力値 (clarity / conviction / freeText) を保持し、
- * 送信前のバリデーションを行う。
- *
- * - clarity / conviction が 1〜5 の整数であること (Req 4.1, 4.2, 12.1, 12.2)
- * - 自由記述が 1000 文字以内であること (Req 4.1, 4.2, 12.1, 12.2)
- * - 不正時は送信を中止できるよう対象フィールドを返し、入力済みの値は保持する (Req 14.4)
- *
- * design.md「Data Models」の SurveyAnswer と、Component: SurveyStore 契約に準拠する。
+ * 設問は Box「12_現状整理/事前事後アンケート案.md」(2026-11-11 改訂) に準拠する。
+ *   事前: P0 頻度 / P1 説明できる / P2 つながりが分かる / P3 原因 (複数選択) / 年代 (任意)
+ *   事後: A1 説明できる / A2 つながりが分かる / A3 当てはまる / A4 気づいた / 感想 (任意)
+ * B群 (比較群) は結果を見る前に事後アンケートに答えるため A3・A4 を聞かない。
  */
 
-import {
-  SURVEY_SCALE_MIN,
-  SURVEY_SCALE_MAX,
-  FREE_TEXT_MAX_LENGTH,
-  type SurveyAnswer,
-} from "../models/types";
+import { SURVEY_SCALE_MAX, SURVEY_SCALE_MIN } from "@/models/types";
 
-/** アンケート種別。事前は conviction を持たず、事後は conviction を必須とする。 */
-export type SurveyKind = "pre" | "post";
+// ============================================================
+// 選択肢
+// ============================================================
 
-/** バリデーション対象フィールド名 (強調表示の識別子に用いる) */
-export type SurveyField = "clarity" | "conviction" | "freeText";
-
-/**
- * バリデーション結果。
- * - valid が true のとき invalidFields は空配列
- * - valid が false のとき invalidFields に不正なフィールドが列挙される (強調表示用)
- */
-export interface SurveyValidationResult {
-  valid: boolean;
-  invalidFields: SurveyField[];
+export interface Option<T> {
+  value: T;
+  label: string;
 }
 
-/**
- * 保持中のアンケート入力値。
- * 尺度は未入力を表現するため number | undefined とする。
- */
-export interface SurveyInput {
-  clarity?: number;
-  conviction?: number;
-  freeText?: string;
+/** 5段階 (1〜5)。診断20問と同じ表現 */
+export const SCALE_OPTIONS: Option<number>[] = [
+  { value: 1, label: "まったく当てはまらない" },
+  { value: 2, label: "あまり当てはまらない" },
+  { value: 3, label: "どちらともいえない" },
+  { value: 4, label: "やや当てはまる" },
+  { value: 5, label: "非常によく当てはまる" },
+];
+
+/** P0 頻度 (1〜4) */
+export const FREQUENCY_OPTIONS: Option<number>[] = [
+  { value: 1, label: "よくある" },
+  { value: 2, label: "ときどきある" },
+  { value: 3, label: "あまりない" },
+  { value: 4, label: "ほとんどない" },
+];
+
+export const CAUSE_NONE = 98;
+export const CAUSE_UNKNOWN = 99;
+
+/** P3 原因 (分類ID 1〜10 と 98・99)。98・99 はほかと同時に選べない */
+export const CAUSE_OPTIONS: Option<number>[] = [
+  { value: 1, label: "時間や気持ちに余裕がない" },
+  { value: 2, label: "休んでも疲れが取れない" },
+  { value: 3, label: "情報が多すぎて、頭が疲れる" },
+  { value: 4, label: "人と比べて落ち込んでしまう" },
+  { value: 5, label: "本音を話せる相手がいない、さびしい" },
+  { value: 6, label: "将来が不安" },
+  { value: 7, label: "周りの状況に振り回されている" },
+  { value: 8, label: "理想の自分と今の自分に差がある" },
+  { value: 9, label: "同じことを何度も考えてしまう" },
+  { value: 10, label: "決められない、最初の一歩が踏み出せない" },
+  { value: CAUSE_NONE, label: "どれも当てはまらない" },
+  { value: CAUSE_UNKNOWN, label: "わからない" },
+];
+
+/** 年代 (任意) */
+export const AGE_OPTIONS: Option<string>[] = [
+  { value: "20s", label: "20代" },
+  { value: "30s", label: "30代" },
+  { value: "40s", label: "40代" },
+  { value: "50plus", label: "50代以上" },
+  { value: "no_answer", label: "回答しない" },
+];
+
+/** 事後アンケートの感想の上限文字数 */
+export const COMMENT_MAX_LENGTH = 200;
+
+// ============================================================
+// 入力と検証
+// ============================================================
+
+export interface PreSurveyInput {
+  frequency?: number;
+  explain?: number;
+  relation?: number;
+  causes: number[];
+  ageGroup?: string;
 }
 
-/**
- * clarity / conviction が 1〜5 の整数であるかを判定する。
- * undefined・非整数・範囲外はすべて不正とする。
- */
+export type PreSurveyField = "frequency" | "explain" | "relation" | "causes" | "ageGroup";
+
+export interface PostSurveyInput {
+  explain?: number;
+  relation?: number;
+  fit?: number;
+  discovery?: number;
+  comment?: string;
+}
+
+export type PostSurveyField = "explain" | "relation" | "fit" | "discovery" | "comment";
+
+export type Group = "A" | "B";
+
+/** 1〜5 の整数か */
 export function isValidScale(value: number | undefined): value is number {
   return (
     typeof value === "number" &&
@@ -57,109 +102,51 @@ export function isValidScale(value: number | undefined): value is number {
   );
 }
 
+function isIn<T>(value: T | undefined, options: Option<T>[]): boolean {
+  return value !== undefined && options.some((o) => o.value === value);
+}
+
+/** 事前アンケートの未入力・不正な項目を返す (空なら送信できる) */
+export function validatePreSurvey(input: PreSurveyInput): PreSurveyField[] {
+  const invalid: PreSurveyField[] = [];
+  if (!isIn(input.frequency, FREQUENCY_OPTIONS)) invalid.push("frequency");
+  if (!isValidScale(input.explain)) invalid.push("explain");
+  if (!isValidScale(input.relation)) invalid.push("relation");
+  const causes = input.causes;
+  const exclusive = causes.some((c) => c === CAUSE_NONE || c === CAUSE_UNKNOWN);
+  if (
+    causes.length === 0 ||
+    new Set(causes).size !== causes.length ||
+    !causes.every((c) => isIn(c, CAUSE_OPTIONS)) ||
+    (exclusive && causes.length > 1)
+  ) {
+    invalid.push("causes");
+  }
+  if (input.ageGroup !== undefined && !isIn(input.ageGroup, AGE_OPTIONS)) invalid.push("ageGroup");
+  return invalid;
+}
+
+/** 事後アンケートの未入力・不正な項目を返す。B群は A3・A4 を聞かない */
+export function validatePostSurvey(input: PostSurveyInput, group: Group): PostSurveyField[] {
+  const invalid: PostSurveyField[] = [];
+  if (!isValidScale(input.explain)) invalid.push("explain");
+  if (!isValidScale(input.relation)) invalid.push("relation");
+  if (group === "A") {
+    if (!isValidScale(input.fit)) invalid.push("fit");
+    if (!isValidScale(input.discovery)) invalid.push("discovery");
+  }
+  if ((input.comment ?? "").trim().length > COMMENT_MAX_LENGTH) invalid.push("comment");
+  return invalid;
+}
+
 /**
- * 自由記述が 1000 文字以内かを判定する。
- * 未入力 (undefined / 空文字) は任意項目のため有効とする。
+ * P3 のチェックを切り替えたあとの選択を返す。
+ * 98「どれも当てはまらない」・99「わからない」を選ぶとほかは外れ、
+ * ほかを選ぶと 98・99 は外れる。
  */
-export function isValidFreeText(value: string | undefined): boolean {
-  if (value === undefined) return true;
-  return value.length <= FREE_TEXT_MAX_LENGTH;
-}
-
-/** SurveyStore の公開契約 */
-export interface SurveyStore {
-  /** 対象アンケート種別 ("pre" | "post") */
-  readonly kind: SurveyKind;
-  /** clarity を設定する (入力保持) */
-  setClarity(value: number | undefined): void;
-  /** conviction を設定する (事後のみ意味を持つ。事前では保持しても検証に用いない) */
-  setConviction(value: number | undefined): void;
-  /** freeText を設定する (入力保持) */
-  setFreeText(value: string | undefined): void;
-  /** 現在の入力値のスナップショットを返す (入力保持の確認用) */
-  getInput(): SurveyInput;
-  /** 現在の入力を検証し、不正フィールドを列挙した結果を返す。状態は変更しない (値は保持) */
-  validate(): SurveyValidationResult;
-  /** 検証に通る場合のみ送信用の SurveyAnswer を返す。不正時は null (送信中止) */
-  buildAnswer(): SurveyAnswer | null;
-}
-
-/** SurveyStore の実装 */
-class SurveyStoreImpl implements SurveyStore {
-  readonly kind: SurveyKind;
-  private clarity?: number;
-  private conviction?: number;
-  private freeText?: string;
-
-  constructor(kind: SurveyKind) {
-    this.kind = kind;
-  }
-
-  setClarity(value: number | undefined): void {
-    this.clarity = value;
-  }
-
-  setConviction(value: number | undefined): void {
-    this.conviction = value;
-  }
-
-  setFreeText(value: string | undefined): void {
-    this.freeText = value;
-  }
-
-  getInput(): SurveyInput {
-    return {
-      clarity: this.clarity,
-      conviction: this.conviction,
-      freeText: this.freeText,
-    };
-  }
-
-  validate(): SurveyValidationResult {
-    const invalidFields: SurveyField[] = [];
-
-    // clarity は事前/事後ともに 1〜5 の整数が必須 (Req 4.2, 12.2)
-    if (!isValidScale(this.clarity)) {
-      invalidFields.push("clarity");
-    }
-
-    // conviction は事後アンケートのみ 1〜5 の整数が必須 (Req 12.2)
-    if (this.kind === "post" && !isValidScale(this.conviction)) {
-      invalidFields.push("conviction");
-    }
-
-    // 自由記述は 1000 文字以内 (Req 4.2, 12.2)
-    if (!isValidFreeText(this.freeText)) {
-      invalidFields.push("freeText");
-    }
-
-    return {
-      valid: invalidFields.length === 0,
-      invalidFields,
-    };
-  }
-
-  buildAnswer(): SurveyAnswer | null {
-    const result = this.validate();
-    // 不正時は送信を中止 (null)。入力済み値は内部状態に保持されたまま (Req 14.4)
-    if (!result.valid) {
-      return null;
-    }
-
-    const answer: SurveyAnswer = {
-      clarity: this.clarity as number,
-    };
-    if (this.kind === "post") {
-      answer.conviction = this.conviction as number;
-    }
-    if (this.freeText !== undefined && this.freeText.length > 0) {
-      answer.freeText = this.freeText;
-    }
-    return answer;
-  }
-}
-
-/** SurveyStore を生成する */
-export function createSurveyStore(kind: SurveyKind): SurveyStore {
-  return new SurveyStoreImpl(kind);
+export function toggleCause(current: number[], value: number, checked: boolean): number[] {
+  if (!checked) return current.filter((c) => c !== value);
+  if (value === CAUSE_NONE || value === CAUSE_UNKNOWN) return [value];
+  const rest = current.filter((c) => c !== CAUSE_NONE && c !== CAUSE_UNKNOWN && c !== value);
+  return [...rest, value].sort((a, b) => a - b);
 }

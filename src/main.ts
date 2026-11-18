@@ -23,10 +23,12 @@
 import "@/styles/global.css";
 import { createRouter, type Router, type ViewName } from "@/router/router";
 import { createDiagnosisStore } from "@/store/diagnosisStore";
-import { createSurveyStore } from "@/store/surveyStore";
-import { diagnose, type FactorMeta, type QuestionWeight } from "@/engine/diagnose";
+import type { Group } from "@/store/surveyStore";
+import type { FactorMeta } from "@/engine/diagnose";
 import { createErrorHandler } from "@/api/errorHandler";
 import { createApiClient } from "@/api/apiClient";
+import { isFactorOrderValid } from "@/api/resultMapping";
+import { initTestModeFromUrl, isTestMode } from "@/config";
 import { createMapRenderer } from "@/views/mapRenderer";
 import { renderTopView } from "@/views/topView";
 import { renderAboutView } from "@/views/aboutView";
@@ -62,11 +64,11 @@ interface QuestionsFile {
 
 /**
  * loadQuestions: public/questions.json を読み込み、
- * 表示用 QuestionDef[] と診断用 QuestionWeight[] / FactorMeta[] に分解する。
+ * 表示用 QuestionDef[] と要因メタ FactorMeta[] に分解する。
+ * (採点はバックエンドで行う。weights はバックエンドの scoring.py と同じ値を置いている)
  */
 async function loadQuestions(): Promise<{
   questions: QuestionDef[];
-  weightTable: QuestionWeight[];
   factorMeta: FactorMeta[];
 }> {
   const res = await fetch("/questions.json", { cache: "no-cache" });
@@ -81,12 +83,7 @@ async function loadQuestions(): Promise<{
     choices: q.choices,
   }));
 
-  const weightTable: QuestionWeight[] = file.questions.map((q) => ({
-    questionId: q.id,
-    weights: q.weights,
-  }));
-
-  return { questions, weightTable, factorMeta: file.factorMeta };
+  return { questions, factorMeta: file.factorMeta };
 }
 
 // ============================================================
@@ -101,6 +98,48 @@ interface AppState {
   sessionId: string;
   /** ISO8601 形式の同意日時 (Req 3.3)。未同意なら undefined。 */
   consentAt?: string;
+  /** 事前アンケート送信 (API-01) で発行された診断ID・群・テストモードか */
+  diagnosis?: DiagnosisInfo;
+}
+
+interface DiagnosisInfo {
+  diagnosisId: string;
+  group: Group;
+  isTest: boolean;
+}
+
+/** 診断IDなどをタブを閉じるまで保持する (再読み込みしても続きから送れるように) */
+const DIAGNOSIS_KEY = "moyamoya.diagnosis.v1";
+
+function saveDiagnosisInfo(info: DiagnosisInfo): void {
+  try {
+    sessionStorage.setItem(DIAGNOSIS_KEY, JSON.stringify(info));
+  } catch {
+    // 保存できなくても画面は続ける
+  }
+}
+
+function loadDiagnosisInfo(): DiagnosisInfo | undefined {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(DIAGNOSIS_KEY) ?? "null");
+    if (parsed && typeof parsed.diagnosisId === "string" && (parsed.group === "A" || parsed.group === "B")) {
+      return { diagnosisId: parsed.diagnosisId, group: parsed.group, isTest: parsed.isTest === true };
+    }
+  } catch {
+    // 壊れていれば無かったことにする
+  }
+  return undefined;
+}
+
+/** テストモードの間、画面の上に帯を出す (本番の切り替え漏れに気づけるように) */
+function renderTestModeBanner(): void {
+  if (document.getElementById("test-mode-banner")) return;
+  const banner = document.createElement("div");
+  banner.id = "test-mode-banner";
+  banner.className = "test-mode-banner";
+  banner.setAttribute("role", "note");
+  banner.textContent = "テストモード：この回答はテストデータとして保存され、分析には使われません";
+  document.body.prepend(banner);
 }
 
 // ============================================================
@@ -113,6 +152,10 @@ async function bootstrap(): Promise<void> {
     throw new Error("#app が見つかりません");
   }
 
+  // URL に ?test=1 があればテストモードにする (そのタブの間有効)
+  initTestModeFromUrl();
+  if (isTestMode()) renderTestModeBanner();
+
   // ---- 1. 質問定義の読み込み (診断エンジンへ渡す) ----
   let loaded: Awaited<ReturnType<typeof loadQuestions>>;
   try {
@@ -122,13 +165,20 @@ async function bootstrap(): Promise<void> {
     console.error(error);
     return;
   }
-  const { questions, weightTable, factorMeta } = loaded;
+  const { questions, factorMeta } = loaded;
+  if (!isFactorOrderValid(factorMeta)) {
+    renderFatal(app, "質問データの形式が正しくありません。管理者に連絡してください。");
+    console.error("questions.json の factorMeta が分類ID (1〜10) の順になっていません");
+    return;
+  }
 
   // ---- 2. sessionId を生成 (起動時に一意発行) ----
   const appState: AppState = {
     consented: false,
     sessionId: crypto.randomUUID(),
+    diagnosis: loadDiagnosisInfo(),
   };
+  if (appState.diagnosis?.isTest) renderTestModeBanner();
 
   // ---- 3. ストア/エンジン/ApiClient/ErrorHandler/MapRenderer を構築 ----
   const diagnosisStore = createDiagnosisStore({ sessionId: appState.sessionId });
@@ -139,9 +189,6 @@ async function bootstrap(): Promise<void> {
     appState.sessionId = diagnosisStore.getSessionId();
     appState.consented = diagnosisStore.isConsented();
   }
-  const preSurveyStore = createSurveyStore("pre");
-  const postSurveyStore = createSurveyStore("post");
-
   const errorHandler = createErrorHandler();
   const apiClient = createApiClient({ errorHandler });
   const mapRenderer = createMapRenderer();
@@ -188,11 +235,14 @@ async function bootstrap(): Promise<void> {
 
       case "preSurvey": {
         const preView = createPreSurveyView(app, {
-          store: preSurveyStore,
           apiClient,
-          getSessionId: () => appState.sessionId,
-          // Req 4.7: 保存成功後に質問画面へ遷移する。
-          onSuccess: () => router.navigate("questions"),
+          // 保存成功 → 診断IDなどを保持して質問画面へ遷移する。
+          onSuccess: (res) => {
+            appState.diagnosis = { diagnosisId: res.diagnosisId, group: res.group, isTest: res.isTest };
+            saveDiagnosisInfo(appState.diagnosis);
+            if (res.isTest) renderTestModeBanner();
+            router.navigate("questions");
+          },
         });
         preView.render();
         break;
@@ -213,31 +263,30 @@ async function bootstrap(): Promise<void> {
       case "result": {
         const resultView = createResultView(app, {
           store: diagnosisStore,
-          diagnose,
-          weightTable,
           factorMeta,
           apiClient,
           mapRenderer,
-          getSessionId: () => appState.sessionId,
+          getDiagnosisId: () => appState.diagnosis?.diagnosisId,
           navigateToPostSurvey: () => router.navigate("postSurvey"),
+          navigateToTop: () => router.navigate("top"),
         });
-        // enter は診断算出→保存→描画を行う非同期処理 (失敗しても描画は継続)。
+        // enter は API-02 で採点→描画を行う非同期処理。
         void resultView.enter();
         break;
       }
 
       case "postSurvey":
         renderPostSurveyView(app, {
-          store: postSurveyStore,
           apiClient,
-          getSessionId: () => appState.sessionId,
+          getDiagnosisId: () => appState.diagnosis?.diagnosisId,
+          getGroup: () => appState.diagnosis?.group ?? "A",
           // Req 12.7 / 13.1: 保存成功後に完了画面へ遷移する。
           navigateToComplete: () => router.navigate("complete"),
         });
         break;
 
       case "complete":
-        renderCompleteView(app, {});
+        renderCompleteView(app, { diagnosisId: appState.diagnosis?.diagnosisId });
         break;
     }
   };
