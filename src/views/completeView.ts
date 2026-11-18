@@ -19,6 +19,8 @@ export interface CompleteViewOptions {
    * 指定された場合のみ「診断結果を再表示する」ボタンを有効状態で表示する。
    */
   onReplayResult?: () => void;
+  /** 診断ID。データの削除 (同意の撤回) を依頼するときに使うので表示する (SCR-08)。 */
+  diagnosisId?: string;
 }
 
 /**
@@ -30,7 +32,7 @@ export function renderCompleteView(
   container: HTMLElement,
   options: CompleteViewOptions = {},
 ): () => void {
-  const { onReplayResult } = options;
+  const { onReplayResult, diagnosisId } = options;
 
   container.replaceChildren();
 
@@ -54,6 +56,14 @@ export function renderCompleteView(
   message.textContent =
     "一連の診断体験はこれで終了です。ご協力ありがとうございました。";
   section.appendChild(message);
+
+  if (diagnosisId) {
+    const idNote = document.createElement("p");
+    idNote.className = "complete__id";
+    idNote.dataset.role = "diagnosis-id";
+    idNote.textContent = `診断ID：${diagnosisId}（回答データの削除を希望するときは、この診断IDを研究メンバーにお伝えください）`;
+    section.appendChild(idNote);
+  }
 
   let onReplayClick: (() => void) | undefined;
   let replayButton: HTMLButtonElement | undefined;
