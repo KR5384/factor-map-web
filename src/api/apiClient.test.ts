@@ -111,7 +111,14 @@ describe("postPreSurvey", () => {
 
 describe("postDiagnosis", () => {
   it("回答を 1〜5 にして送り、採点結果をそのまま返す", async () => {
-    const result = { diagnosis_id: "d-1", scores: [], shown: [], main_category_id: null, low_moyamoya: true };
+    const result = {
+      diagnosis_id: "d-1",
+      scores: [],
+      circles: [],
+      type_categories: [],
+      main_category_id: null,
+      low_moyamoya: true,
+    };
     const { fn, calls } = fakeFetch(200, result);
     const res = await client(fn).postDiagnosis({ diagnosisId: "d-1", answers: allAnswers("3") });
     expect(calls[0].url).toBe("https://api.example/api/v1/factor-analyses");

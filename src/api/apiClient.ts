@@ -55,18 +55,39 @@ export interface DiagnosisRequest {
   answers: DiagnosisAnswers;
 }
 
-/** API-02 のレスポンス (バックエンドの形のまま) */
+/** 順位つきの分類 (rank は 1 始まり) */
+export interface RankedCategory {
+  rank: number;
+  category_id: number;
+  score: number;
+}
+
+/**
+ * API-02 のレスポンス (バックエンドの形のまま。API仕様書 0.3「API-02 診断」)。
+ *
+ * 表示ルールはバックエンド (factor-map-api の scoring.py) が決める。画面では計算しない。
+ *   - circles        : 円に出す分類。点数の高い順に最大5つ、20点未満は出さない (タイプの分類は必ず出す)
+ *   - type_categories: タイプの分類。1位の85%以上かつ50点以上、最大3つ。
+ *                      1位が50点未満 (low_moyamoya) は1位の1つ、全部0点なら空
+ *   - links          : タイプの分類どうしの組 (2つなら1本、3つなら3本)
+ */
 export interface FactorAnalysisResponse {
   diagnosis_id: string;
   scoring_version: string;
   /** 10分類すべての点数 (分類ID順) */
   scores: { category_id: number; score: number }[];
-  /** 結果画面で表示する分類 (順位順、最大4つ) */
-  shown: { rank: number; category_id: number; score: number }[];
+  /** 円に出す分類 (順位順、0〜5件) */
+  circles: RankedCategory[];
+  /** タイプの分類 (順位順、0〜3件) */
+  type_categories: RankedCategory[];
+  /** 1位の分類。全部0点のときだけ null */
   main_category_id: number | null;
+  /** タイプID。分類IDを小さい順に2桁でつないだもの ("05" / "03-09" / "03-05-09")。全部0点なら null */
   result_type_id: string | null;
+  /** 1位でも50点未満。true でもタイプ (1つ) は返る */
   low_moyamoya: boolean;
-  links: { from: number; to: number; strength: number }[];
+  /** 線でつなぐタイプの分類の組 */
+  links: { from: number; to: number }[];
 }
 
 export interface PostSurveyRequest {

@@ -16,7 +16,12 @@
 
 import type { DiagnosisResult, Factor } from "@/models/types";
 import { SCORE_MAX, SCORE_MIN } from "@/models/types";
-import type { MapLink } from "@/engine/factorLinks";
+
+/** 円どうしを結ぶ線 1 本 (向きは無い)。タイプの要因どうしを結ぶのに使う。 */
+export interface MapLine {
+  from: string;
+  to: string;
+}
 
 // ============================================================
 // レイアウト定数
@@ -117,15 +122,15 @@ export function computeLayout(factors: Factor[]): MapLayout {
 }
 
 // ============================================================
-// 純粋関数: つながり (矢印) の線分算出
+// 純粋関数: 線の線分算出
 // ============================================================
 
-/** 矢印の先端とバブル外周の間に空ける隙間 (px)。 */
-const ARROW_GAP = 4;
+/** 線の端とバブル外周の間に空ける隙間 (px)。 */
+const LINE_GAP = 4;
 
-/** バブル外周から外周へ引く 1 本の矢印。 */
+/** バブル外周から外周へ引く 1 本の線。 */
 export interface LinkSegment {
-  link: MapLink;
+  link: MapLine;
   x1: number;
   y1: number;
   x2: number;
@@ -133,15 +138,15 @@ export interface LinkSegment {
 }
 
 /**
- * computeLinkSegments: 配置済みバブルとつながり定義から、矢印の線分を算出する純粋関数。
+ * computeLinkSegments: 配置済みバブルと線の定義から、線分を算出する純粋関数。
  *
- * - 起点・終点の両方がマップ上にあるつながりだけを対象にする。
+ * - 両端がマップ上にある線だけを対象にする。
  * - 線分はバブル中心ではなく外周から外周へ引く (文字と重ならない)。
- * - 2つのバブルが近すぎて線を引く長さが取れない場合は、そのつながりを描かない。
+ * - 2つのバブルが近すぎて線を引く長さが取れない場合は、その線を描かない。
  */
 export function computeLinkSegments(
   bubbles: readonly BubbleLayout[],
-  links: readonly MapLink[]
+  links: readonly MapLine[]
 ): LinkSegment[] {
   const byId = new Map<string, BubbleLayout>();
   for (const b of bubbles) byId.set(b.factor.id, b);
@@ -155,16 +160,16 @@ export function computeLinkSegments(
     const dx = b.cx - a.cx;
     const dy = b.cy - a.cy;
     const dist = Math.hypot(dx, dy);
-    if (dist <= a.radius + b.radius + ARROW_GAP * 2) continue;
+    if (dist <= a.radius + b.radius + LINE_GAP * 2) continue;
 
     const ux = dx / dist;
     const uy = dy / dist;
     segments.push({
       link,
-      x1: a.cx + ux * (a.radius + ARROW_GAP),
-      y1: a.cy + uy * (a.radius + ARROW_GAP),
-      x2: b.cx - ux * (b.radius + ARROW_GAP),
-      y2: b.cy - uy * (b.radius + ARROW_GAP),
+      x1: a.cx + ux * (a.radius + LINE_GAP),
+      y1: a.cy + uy * (a.radius + LINE_GAP),
+      x2: b.cx - ux * (b.radius + LINE_GAP),
+      y2: b.cy - uy * (b.radius + LINE_GAP),
     });
   }
   return segments;
@@ -176,8 +181,10 @@ export function computeLinkSegments(
 
 /** render の任意オプション。 */
 export interface MapRenderOptions {
-  /** マップ上に矢印で描くつながり。省略時は矢印なし。 */
-  links?: readonly MapLink[];
+  /** 円どうしを結ぶ線 (タイプの要因どうし)。省略時は線なし。 */
+  links?: readonly MapLine[];
+  /** 色を変える円 (タイプの要因) の id。省略時はどれも変えない。 */
+  highlightIds?: readonly string[];
 }
 
 /** design.md Component 5 の契約 (options は後方互換の任意引数)。 */
@@ -236,60 +243,47 @@ export function renderMap(
   svg.setAttribute("aria-label", "診断マップ");
   svg.dataset.bubbleCount = String(layout.bubbles.length);
 
-  // 矢印はバブルの下に描く (先に追加した要素が下になる)。
-  if (segments.length > 0) {
-    svg.appendChild(createArrowDefs());
-    for (const seg of segments) {
-      svg.appendChild(createLinkLine(seg));
-    }
+  // 線はバブルの下に描く (先に追加した要素が下になる)。
+  for (const seg of segments) {
+    svg.appendChild(createLinkLine(seg));
   }
 
+  const highlight = new Set(options.highlightIds ?? []);
   for (const bubble of layout.bubbles) {
-    svg.appendChild(createBubbleGroup(bubble, bubble.factor.id === result.topFactorId));
+    svg.appendChild(
+      createBubbleGroup(bubble, {
+        isTop: bubble.factor.id === result.topFactorId,
+        isType: highlight.has(bubble.factor.id),
+      })
+    );
   }
 
   container.appendChild(svg);
 }
 
-/** 実線用・点線用の矢印の先端 (marker) 定義。 */
-function createArrowDefs(): SVGDefsElement {
-  const defs = document.createElementNS(SVG_NS, "defs") as SVGDefsElement;
-  for (const status of ["confirmed", "unconfirmed"] as const) {
-    const marker = document.createElementNS(SVG_NS, "marker");
-    marker.setAttribute("id", `map-arrow-${status}`);
-    marker.setAttribute("viewBox", "0 0 10 10");
-    marker.setAttribute("refX", "9");
-    marker.setAttribute("refY", "5");
-    marker.setAttribute("markerWidth", "7");
-    marker.setAttribute("markerHeight", "7");
-    marker.setAttribute("orient", "auto");
-    const path = document.createElementNS(SVG_NS, "path");
-    path.setAttribute("d", "M0,0 L10,5 L0,10 z");
-    path.setAttribute("class", `map-arrow map-arrow--${status}`);
-    marker.appendChild(path);
-    defs.appendChild(marker);
-  }
-  return defs;
-}
-
-/** つながり 1 本分の矢印 (<line>) を生成する。実線/点線は status で切り替える。 */
+/** 線 1 本分の <line> を生成する。 */
 function createLinkLine(seg: LinkSegment): SVGLineElement {
   const line = document.createElementNS(SVG_NS, "line") as SVGLineElement;
   line.setAttribute("x1", String(seg.x1));
   line.setAttribute("y1", String(seg.y1));
   line.setAttribute("x2", String(seg.x2));
   line.setAttribute("y2", String(seg.y2));
-  line.setAttribute("class", `map-link map-link--${seg.link.status}`);
-  line.setAttribute("marker-end", `url(#map-arrow-${seg.link.status})`);
+  line.setAttribute("class", "map-link");
   line.dataset.from = seg.link.from;
   line.dataset.to = seg.link.to;
   return line;
 }
 
-/** 1つのバブル (円 + ラベル) を表す <g> 要素を生成する。 */
-function createBubbleGroup(bubble: BubbleLayout, isTop: boolean): SVGGElement {
+/** 1つのバブル (円 + ラベル) を表す <g> 要素を生成する。タイプの要因は色を変える。 */
+function createBubbleGroup(
+  bubble: BubbleLayout,
+  flags: { isTop: boolean; isType: boolean }
+): SVGGElement {
   const group = document.createElementNS(SVG_NS, "g") as SVGGElement;
-  group.setAttribute("class", isTop ? "bubble bubble--top" : "bubble");
+  const classes = ["bubble"];
+  if (flags.isTop) classes.push("bubble--top");
+  if (flags.isType) classes.push("bubble--type");
+  group.setAttribute("class", classes.join(" "));
   group.dataset.factorId = bubble.factor.id;
   group.dataset.score = String(bubble.factor.score);
 

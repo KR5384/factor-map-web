@@ -69,6 +69,11 @@ export interface DiagnosisResult {
   topFactorId: string;
   /** 算出時刻 ISO8601 */
   computedAt: string;
+  /**
+   * タイプ判定に使った要因 id (順位順、最大3つ)。再表示用に保持する。
+   * 旧データには無い。
+   */
+  typeFactorIds?: string[];
 }
 
 // ============================================================

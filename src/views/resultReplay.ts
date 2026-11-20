@@ -22,9 +22,16 @@
 
 import type { DiagnosisResult, Factor } from "@/models/types";
 import { SCORE_MAX, SCORE_MIN } from "@/models/types";
-import type { MapRenderer } from "@/views/mapRenderer";
-import { selectDisplayFactors } from "@/engine/displayFilter";
-import { linksAmong } from "@/engine/factorLinks";
+import type { MapLine, MapRenderer } from "@/views/mapRenderer";
+
+/** タイプの要因どうしをすべて結ぶ線 (結果画面と同じ。2つなら1本、3つなら3本)。 */
+function linesAmong(ids: readonly string[]): MapLine[] {
+  const lines: MapLine[] = [];
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = i + 1; j < ids.length; j++) lines.push({ from: ids[i], to: ids[j] });
+  }
+  return lines;
+}
 
 // ============================================================
 // 保持キー
@@ -161,13 +168,10 @@ export function validateStoredResult(raw: string | null): DiagnosisResult | null
     factors.push(factor);
   }
 
-  // factors が score 降順 (同点 id 昇順) であることを検証する。
-  // 保持結果は確定時にこの順で生成される前提であり、改ざん・破損を検出する。
+  // factors が score 降順であることを検証する。改ざん・破損を検出する。
+  // 同点の並びはバックエンドの順位 (分類IDの小さい順) なので、id の順は問わない。
   for (let i = 1; i < factors.length; i++) {
-    const prev = factors[i - 1];
-    const curr = factors[i];
-    if (curr.score > prev.score) return null;
-    if (curr.score === prev.score && curr.id < prev.id) return null;
+    if (factors[i].score > factors[i - 1].score) return null;
   }
 
   // topFactorId の検証 (Req 17.2/17.3)。非空文字列かつ最大要因 (先頭) と一致すること。
@@ -177,10 +181,20 @@ export function validateStoredResult(raw: string | null): DiagnosisResult | null
   // computedAt の検証 (Req 17.3)。非空文字列であること。
   if (!isNonEmptyString(obj.computedAt)) return null;
 
+  // typeFactorIds は任意項目 (旧データには無い)。あれば factors に含まれる id だけであること。
+  let typeFactorIds: string[] | undefined;
+  if ("typeFactorIds" in obj && obj.typeFactorIds !== undefined) {
+    if (!isStringArray(obj.typeFactorIds)) return null;
+    const ids = new Set(factors.map((f) => f.id));
+    if (!obj.typeFactorIds.every((id) => ids.has(id))) return null;
+    typeFactorIds = [...obj.typeFactorIds];
+  }
+
   return {
     factors,
     topFactorId: obj.topFactorId,
     computedAt: obj.computedAt,
+    ...(typeFactorIds ? { typeFactorIds } : {}),
   };
 }
 
@@ -257,15 +271,14 @@ export function createResultReplay(deps: ResultReplayDeps): ResultReplay {
       // 妥当なら保持された並び順・topFactorId でマップを再描画する (Req 17.2)。
       // MapRenderer は与えられた DiagnosisResult から決定的に描画するため、
       // 保持値の factors 並び順と topFactorId がそのままマップへ反映される。
-      // 結果画面と同じ見え方にするため、同じ表示ボーダーで絞り込み、
-      // 画面に出る要因どうしの根拠のあるつながりを矢印で描く。
-      // 絞り込みは並び順を保つので、先頭 (topFactorId) も変わらない。
-      const displayResult: DiagnosisResult = {
-        ...result,
-        factors: selectDisplayFactors(result.factors),
-      };
-      const links = linksAmong(displayResult.factors.map((f) => f.id));
-      mapRenderer.render(getMapContainer(), displayResult, { links });
+      // 保持値は結果画面で円に出した要因 (バックエンドの表示ルールで選ばれたもの) なので、
+      // 絞り込み直さずにそのまま描く。結果画面と同じく、タイプの円は色を変え、
+      // タイプの要因どうしを線で結ぶ。旧データ (typeFactorIds なし) は線も色分けも無し。
+      const typeIds = result.typeFactorIds ?? [];
+      mapRenderer.render(getMapContainer(), result, {
+        links: linesAmong(typeIds),
+        highlightIds: typeIds,
+      });
       return true;
     },
   };

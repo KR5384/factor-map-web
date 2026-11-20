@@ -512,12 +512,16 @@ fieldset.pre-survey__clarity,
   font-weight: 600;
   font-family: var(--font-sans);
 }
-.bubble--top circle {
+/* タイプの円 (タイプ名の元になった要因) は色を変える。1位は枠を太くする */
+.bubble--type circle {
   fill: var(--c-accent);
   stroke: #d2851f;
 }
-.bubble--top .bubble__label {
+.bubble--type .bubble__label {
   fill: #5a3c11;
+}
+.bubble--top circle {
+  stroke-width: 3.5;
 }
 
 /* 見出し (いちばん大きいタイプ名)。主役はマップなので控えめにとどめる */
@@ -546,43 +550,11 @@ fieldset.pre-survey__clarity,
   color: var(--c-text-muted);
 }
 
-/* マップ上の矢印 (つながり)。実線=調査で確認済み、点線=可能性 */
+/* マップ上の線 (タイプの要因どうしを結ぶ) */
 .map-link {
-  stroke: var(--c-text);
+  stroke: #d2851f;
   stroke-width: 2.5;
   fill: none;
-}
-.map-link--unconfirmed {
-  stroke: var(--c-text-muted);
-  stroke-dasharray: 5 4;
-}
-.map-arrow--confirmed {
-  fill: var(--c-text);
-}
-.map-arrow--unconfirmed {
-  fill: var(--c-text-muted);
-}
-
-/* つながりの説明 */
-.result-view__links {
-  margin: 12px 0 18px;
-}
-.result-view__links-list {
-  list-style: none;
-  margin: 0 0 6px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.92rem;
-}
-.result-view__link--unconfirmed {
-  color: var(--c-text-muted);
-}
-.result-view__links-legend {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--c-text-muted);
 }
 
 /* 要因詳細リスト */

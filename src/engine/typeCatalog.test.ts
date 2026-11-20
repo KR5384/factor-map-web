@@ -1,86 +1,58 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
-  FACTOR_ORDER,
-  buildCatalogs,
-  classifyType,
-  parseTypeCsv,
-  singleTypeName,
-  typeKey,
+  allTypeIds,
+  categoryIdsOf,
+  parseTypeCatalog,
+  typeDisplayName,
+  typeIdOf,
 } from "@/engine/typeCatalog";
-import type { Factor } from "@/models/types";
 
-const csv = readFileSync("src/data/moyamoya_175types.csv", "utf-8");
-const ids = FACTOR_ORDER.map((f) => f.id);
+const typesJson = JSON.parse(readFileSync("public/types.json", "utf-8")) as Record<string, unknown>;
 
-/** n 個から k 個選ぶ組み合わせ (固定順)。 */
-function combinations(k: number, from = 0): string[][] {
-  if (k === 0) return [[]];
-  const out: string[][] = [];
-  for (let i = from; i < ids.length; i++) {
-    for (const rest of combinations(k - 1, i + 1)) out.push([ids[i], ...rest]);
-  }
-  return out;
-}
-
-const factor = (id: string, score: number): Factor => ({
-  id,
-  label: id,
-  score,
-  description: "",
-  relatedFactorIds: [],
-});
-
-describe("moyamoya_175types.csv", () => {
-  const catalogs = buildCatalogs(parseTypeCsv(csv));
-
-  it("単独10・2複合45・3複合120 の 175 件がある", () => {
-    expect(catalogs.single.size).toBe(10);
-    expect(catalogs.pair.size).toBe(45);
-    expect(catalogs.triple.size).toBe(120);
+describe("タイプID", () => {
+  it("分類IDを小さい順に2桁でつなぐ (API の result_type_id と同じ形)", () => {
+    expect(typeIdOf([5])).toBe("05");
+    expect(typeIdOf([9, 3])).toBe("03-09");
+    expect(typeIdOf([9, 5, 3])).toBe("03-05-09");
+    expect(categoryIdsOf("03-05-09")).toEqual([3, 5, 9]);
   });
 
-  it("すべての組み合わせにタイプが定義されている", () => {
-    for (const [k, catalog] of [
-      [1, catalogs.single],
-      [2, catalogs.pair],
-      [3, catalogs.triple],
-    ] as const) {
-      for (const combo of combinations(k)) {
-        expect(catalog.has(typeKey(combo)), combo.join("|")).toBe(true);
-      }
-    }
-  });
-
-  it("単独タイプ名を CSV から引ける", () => {
-    expect(singleTypeName("time_margin", catalogs)).toBe("余白ゼロの綱渡り");
-  });
-
-  it("表示要因の数でタイプを判定する", () => {
-    expect(classifyType([factor("recovery", 90)], catalogs)?.displayName).toBe(
-      "『充電が追いつかない』タイプ"
-    );
-    expect(
-      classifyType([factor("recovery", 90), factor("time_margin", 80)], catalogs)?.displayName
-    ).toBe("『完全燃焼・すり減り』タイプ");
-    expect(
-      classifyType(
-        [factor("info_overload", 90), factor("recovery", 85), factor("time_margin", 80)],
-        catalogs
-      )?.displayName
-    ).toBe("『満員御礼パンクさん』");
+  it("全部で 175件 (1つ10・2つ45・3つ120)、重複なし", () => {
+    const ids = allTypeIds();
+    expect(ids).toHaveLength(175);
+    expect(new Set(ids).size).toBe(175);
+    const bySize = [1, 2, 3].map((n) => ids.filter((id) => categoryIdsOf(id).length === n).length);
+    expect(bySize).toEqual([10, 45, 120]);
   });
 });
 
-describe("parseTypeCsv", () => {
-  const head = "No,要因数,要因1,要因2,要因3,タイプ名,解説,出典\n";
+describe("public/types.json", () => {
+  it("175件がそろっていて、すべてにタイプ名がある", () => {
+    const catalog = parseTypeCatalog(typesJson);
+    expect(catalog.size).toBe(175);
+    expect(catalog.get("01")?.name).toBe("余白ゼロの綱渡り");
+    expect(catalog.get("01-02")?.name).toBe("完全燃焼・すり減り");
+  });
+});
 
-  it("要因数と要因列が合わない行は例外にする", () => {
-    expect(() => parseTypeCsv(head + "1,1,回復不足,時間・余白不足,,X,,\n")).toThrow();
-    expect(() => parseTypeCsv(head + "1,2,回復不足,,,X,,\n")).toThrow();
+describe("parseTypeCatalog", () => {
+  it("足りないタイプID があれば例外にする", () => {
+    const { "03-09": _removed, ...rest } = typesJson;
+    expect(() => parseTypeCatalog(rest)).toThrow(/03-09/);
   });
 
-  it("未知の要因名は例外にする", () => {
-    expect(() => parseTypeCsv(head + "1,1,存在しない要因,,,X,,\n")).toThrow();
+  it("タイプ名が空・余計なIDがあれば例外にする", () => {
+    expect(() => parseTypeCatalog({ ...typesJson, "05": { name: "", description: "" } })).toThrow(/05/);
+    expect(() => parseTypeCatalog({ ...typesJson, "11": { name: "x", description: "" } })).toThrow(/11/);
+  });
+});
+
+describe("typeDisplayName", () => {
+  it("1つ・2つは『名前』タイプ、3つは『名前』", () => {
+    const entry = { name: "名前", description: "" };
+    expect(typeDisplayName("05", entry)).toBe("『名前』タイプ");
+    expect(typeDisplayName("03-09", entry)).toBe("『名前』タイプ");
+    expect(typeDisplayName("03-05-09", entry)).toBe("『名前』");
   });
 });

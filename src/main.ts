@@ -28,6 +28,7 @@ import type { FactorMeta } from "@/engine/diagnose";
 import { createErrorHandler } from "@/api/errorHandler";
 import { createApiClient } from "@/api/apiClient";
 import { isFactorOrderValid } from "@/api/resultMapping";
+import { loadTypeCatalog, type TypeCatalog } from "@/engine/typeCatalog";
 import { initTestModeFromUrl, isTestMode } from "@/config";
 import { createMapRenderer } from "@/views/mapRenderer";
 import { renderTopView } from "@/views/topView";
@@ -172,6 +173,17 @@ async function bootstrap(): Promise<void> {
     return;
   }
 
+  // タイプ定義 (175件) を読み込み、すべてのタイプIDがそろっているか確かめる。
+  // API の circles / type_categories から作ったIDが必ず見つかるようにするため。
+  let typeCatalog: TypeCatalog;
+  try {
+    typeCatalog = await loadTypeCatalog();
+  } catch (error) {
+    renderFatal(app, "診断結果の表示に使うデータの読み込みに失敗しました。管理者に連絡してください。");
+    console.error(error);
+    return;
+  }
+
   // ---- 2. sessionId を生成 (起動時に一意発行) ----
   const appState: AppState = {
     consented: false,
@@ -264,6 +276,7 @@ async function bootstrap(): Promise<void> {
         const resultView = createResultView(app, {
           store: diagnosisStore,
           factorMeta,
+          typeCatalog,
           apiClient,
           mapRenderer,
           getDiagnosisId: () => appState.diagnosis?.diagnosisId,

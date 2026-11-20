@@ -15,7 +15,6 @@ import type {
   QuestionId,
 } from "@/models/types";
 import { SCORE_MAX, SCORE_MIN } from "@/models/types";
-import { singleTypeName } from "@/engine/typeCatalog";
 
 // ============================================================
 // 診断ロジックの入力型
@@ -96,8 +95,6 @@ export function diagnose(
 
   const factors: Factor[] = factorMeta.map((meta) => {
     const denom = maxRaw[meta.id] || 1; // 0 除算回避
-    // 単独タイプ名は moyamoya_175types.csv が正。
-    const typeName = singleTypeName(meta.id);
     const normalized = clamp(
       Math.round((raw[meta.id] / denom) * 100),
       SCORE_MIN,
@@ -106,7 +103,6 @@ export function diagnose(
     return {
       id: meta.id,
       label: meta.label,
-      ...(typeName !== undefined ? { typeName } : {}),
       score: normalized,
       description: meta.description,
       relatedFactorIds: meta.relatedFactorIds,

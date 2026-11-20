@@ -16,7 +16,7 @@ export const API_BASE_URL: string =
 export const CONSENT_VERSION = "2026-11-v1";
 
 /** フロントの版。結果画面の見せ方などを変えたら上げる (DB の client_version に保存される) */
-export const CLIENT_VERSION = "web-0.2.0";
+export const CLIENT_VERSION = "web-0.3.0"; // 0.3.0: 円 (最大5つ)＋タイプの線＋タイプ名の結果画面 (2026-11-20)
 
 const TEST_MODE_KEY = "moyamoya.testMode";
 

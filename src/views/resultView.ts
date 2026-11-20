@@ -1,15 +1,21 @@
 /**
  * ResultView (診断結果・要因詳細画面): F-11 / F-12 / F-13
  *
- * 20問の回答を API-02 (factor-analyses) に送り、バックエンドが採点した結果を表示する。
- * 採点はバックエンドだけで行う (画面に出す結果と DB に保存する結果を一致させるため)。
+ * 20問の回答を API-02 (factor-analyses) に送り、バックエンドが採点・判定した結果を表示する。
+ * 採点も「どれを出すか」もバックエンドだけで決める (画面に出す結果と DB に保存する結果を一致させるため)。
  * 通信に失敗したときは結果を出さず、再試行ボタンを出す。
+ *
+ * 表示 (2026-11-20 決定):
+ *   - 円        : circles (点数の高い順に最大5つ)。タイプの円は色を変える
+ *   - 線        : links (タイプの要因どうし。2つなら1本、3つなら3本、1つなら無し)
+ *   - タイプ    : result_type_id で types.json を引き、タイプ名＋ひとこと解説を出す
+ *   - もやもやが少ない人 (low_moyamoya): タイプ (1つ) に「もやもやは少なめです」を添える
+ *   - 全部0点 (result_type_id が null): タイプも円も無し。その旨の文だけ出す
  *
  * 要件対応:
  *   - 9.8  回答は送信前に localStorage に保持する
- *   - 10.1 factors の各要素に対応するバブルマップを MapRenderer で描画する
+ *   - 10.1 円に出す要因ごとにバブルを MapRenderer で描画する
  *   - 11.1 各 Factor の説明文と、関連要因IDに対応する表示名を表示する
- *   - 11.2 factors を score 降順 (同点 id 昇順) に提示する
  *   - 11.3 topFactorId を強調表示する
  *   - 11.4 関連要因IDが空の Factor は関連要因を表示せず、説明文は表示する
  *
@@ -26,12 +32,30 @@ import { STORAGE_KEY } from "@/models/types";
 import type { FactorMeta } from "@/engine/diagnose";
 import type { DiagnosisStore } from "@/store/diagnosisStore";
 import type { ApiClient } from "@/api/apiClient";
-import { toDiagnosisResult } from "@/api/resultMapping";
+import {
+  categoryIdOfFactor,
+  toDiagnosisResult,
+  toResultDisplay,
+} from "@/api/resultMapping";
 import type { MapRenderer } from "@/views/mapRenderer";
 import { persistResult } from "@/views/resultReplay";
-import type { FactorAnalysisResponse } from "@/api/apiClient";
-import { linksAmong, type MapLink } from "@/engine/factorLinks";
-import { classifyType, type TypeResult } from "@/engine/typeCatalog";
+import {
+  typeDisplayName,
+  typeIdOf,
+  type TypeCatalog,
+  type TypeEntry,
+} from "@/engine/typeCatalog";
+
+// ============================================================
+// 文言 (正式な文言が決まったらここを直す)
+// ============================================================
+
+/** もやもやが少ない人 (1位でも50点未満) に添える一言。【仮】 */
+export const LOW_MOYAMOYA_MESSAGE = "もやもやは少なめです。";
+
+/** 全部0点 (タイプも円も無い) ときの文。【仮】 */
+export const NO_MOYAMOYA_MESSAGE =
+  "いまは、もやもやの要因はほとんど見当たりませんでした。";
 
 // ============================================================
 // 依存注入 (テスト容易性 / Router 非依存)
@@ -43,6 +67,8 @@ export interface ResultViewDeps {
   store: DiagnosisStore;
   /** 要因メタ情報 (表示名・説明・関連要因)。分類ID 1〜10 の順に並んでいること。 */
   factorMeta: FactorMeta[];
+  /** タイプ定義 (types.json。起動時に 175件そろっていることを確認済み)。 */
+  typeCatalog: TypeCatalog;
   /** API-02 を呼ぶ ApiClient。 */
   apiClient: ApiClient;
   /** 診断マップ描画。 */
@@ -57,19 +83,19 @@ export interface ResultViewDeps {
 
 /** ResultView の公開契約。 */
 export interface ResultView {
-  /** 画面へ入る: 診断算出→保存→マップ/要因詳細描画を行う。 */
+  /** 画面へ入る: 採点 (API-02) → マップ/タイプ/要因詳細の描画を行う。 */
   enter(): Promise<void>;
 }
 
 // ============================================================
-// localStorage への回答保持 (9.8 / 10.5 の土台)
+// localStorage への回答保持 (9.8 の土台)
 // ============================================================
 
 /**
  * persistAnswers: 回答を localStorage の保存済み状態へ反映する。
  *
- * 保存失敗 (POST 失敗) 時でも回答を手元に残すため、POST に先立って書き込む
- * (Req 9.8)。既存の保存済み状態 (sessionId・currentIndex・consented) がある場合は
+ * 送信失敗時でも回答を手元に残すため、送信に先立って書き込む (Req 9.8)。
+ * 既存の保存済み状態 (sessionId・currentIndex・consented) がある場合は
  * その他フィールドを保ったまま answers を更新する。書込自体が失敗しても描画は継続する。
  */
 function persistAnswers(answers: DiagnosisAnswers, sessionId: string): void {
@@ -104,40 +130,35 @@ function persistAnswers(answers: DiagnosisAnswers, sessionId: string): void {
 /**
  * buildFactorDetails: 要因詳細セクション (<ol>) を構築する純粋な DOM 生成。
  *
- * - factors を score 降順 (同点 id 昇順) に並べて提示する (Req 11.2)。
- *   diagnose は既にこの順で返すが、ResultView 側でも安定ソートして不変条件を保証する。
- * - 各 Factor の説明文を表示する (Req 11.1)。
- * - 関連要因IDに対応する表示名を resolveLabel で解決し一覧表示する (Req 11.1)。
+ * - 円に出した要因を、API の順位順のまま並べる。
+ * - 各 Factor の説明文を表示する (Req 11.1)。単独タイプ名があれば見出しに添える。
+ * - 関連要因IDに対応する表示名を一覧表示する (Req 11.1)。関連要因は全要因から名前を引く。
  * - 関連要因IDが空の Factor は関連要因セクションを表示しない (Req 11.4)。
  * - topFactorId に一致する Factor を強調表示する (Req 11.3)。
+ * - タイプの要因には印を付ける (data-type="true")。
  */
 function buildFactorDetails(
-  result: DiagnosisResult,
+  factors: readonly Factor[],
+  topFactorId: string,
+  typeFactorIds: ReadonlySet<string>,
   allFactors: readonly Factor[]
 ): HTMLElement {
-  // id→label の解決表 (関連要因の表示名解決に用いる)。
-  // 表示対象は絞り込み済みだが、関連要因は全要因から名前を引く。
   const labelById = new Map<string, string>();
   for (const f of allFactors) labelById.set(f.id, f.label);
-
-  // score 降順・同点は id 昇順 (Req 11.2)。元配列を壊さないよう複製してソート。
-  const ordered: Factor[] = [...result.factors].sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-  });
 
   const list = document.createElement("ol");
   list.className = "factor-details";
 
-  for (const factor of ordered) {
-    const isTop = factor.id === result.topFactorId;
+  for (const factor of factors) {
+    const isTop = factor.id === topFactorId;
 
     const item = document.createElement("li");
     item.className = isTop ? "factor factor--top" : "factor";
     item.dataset.factorId = factor.id;
     item.dataset.score = String(factor.score);
+    if (typeFactorIds.has(factor.id)) item.dataset.type = "true";
 
-    // 見出し (表示名 + スコア)。最大要因は強調 (Req 11.3)。
+    // 見出し (表示名 + 単独タイプ名)。最大要因は強調 (Req 11.3)。
     const heading = document.createElement("h3");
     heading.className = "factor__label";
     heading.textContent = factor.typeName
@@ -180,7 +201,6 @@ function buildFactorDetails(
         const relatedItem = document.createElement("li");
         relatedItem.className = "factor__related-item";
         relatedItem.dataset.relatedId = relatedId;
-        // 表示名を解決。結果集合に無い id はフォールバックとして id を表示する。
         relatedItem.textContent = labelById.get(relatedId) ?? relatedId;
         relatedList.appendChild(relatedItem);
       }
@@ -195,100 +215,48 @@ function buildFactorDetails(
 }
 
 // ============================================================
-// 見出し・つながりの説明
+// タイプの見出し
 // ============================================================
 
 /**
  * タイプ名の見出しを構築する。
  *
- * 表示する要因が1つなら単独タイプ、2つなら45タイプ、3つ以上なら120タイプの名前になる。
- * 主役はマップなので、見出しは小さめにとどめる。判定に使った要因名も添える。
+ * タイプの要因 (最大3つ) の組み合わせで決まるタイプ名とひとこと解説を出す。
+ * 主役はマップなので、見出しは小さめにとどめる。判定に使った要因名も順位順に添える。
  */
 function buildTypeHeadline(
-  type: TypeResult,
-  allFactors: readonly Factor[]
+  typeId: string,
+  entry: TypeEntry,
+  typeFactors: readonly Factor[]
 ): HTMLElement {
   const box = document.createElement("div");
   box.className = "result-view__headline";
-  box.dataset.typeKind = type.kind;
+  box.dataset.typeId = typeId;
+  box.dataset.typeSize = String(typeFactors.length);
 
   const lead = document.createElement("p");
   lead.className = "result-view__headline-lead";
   lead.textContent =
-    type.kind === "single" ? "いちばん大きいのは…" : "あなたのもやもやは…";
+    typeFactors.length === 1 ? "いちばん大きいのは…" : "あなたのもやもやは…";
   box.appendChild(lead);
 
   const name = document.createElement("p");
   name.className = "result-view__headline-name";
-  name.textContent = type.displayName;
+  name.textContent = typeDisplayName(typeId, entry);
   box.appendChild(name);
 
-  if (type.description) {
+  if (entry.description) {
     const desc = document.createElement("p");
     desc.className = "result-view__headline-desc";
-    desc.textContent = type.description;
+    desc.textContent = entry.description;
     box.appendChild(desc);
   }
 
-  // 判定に使った要因 (例: 時間・余白不足 × 回復不足 × 情報過多/認知負荷)。
-  const labelById = new Map(allFactors.map((f) => [f.id, f.label]));
-  const parts = type.factorIds.map((id) => labelById.get(id) ?? id);
+  // 判定に使った要因 (例: 情報過多/認知負荷 × 反すう/考え続ける状態)。
   const basis = document.createElement("p");
   basis.className = "result-view__headline-basis";
-  basis.textContent = parts.join(" × ");
+  basis.textContent = typeFactors.map((f) => f.label).join(" × ");
   box.appendChild(basis);
-
-  return box;
-}
-
-/**
- * バックエンドが選んだ表示対象 (shown) だけを、順位順に残した結果を返す。
- *
- * 表示ルール (1位は必ず、2位以降は80%以上かつ50点以上、最大4つ) は
- * バックエンドで判定済みなので、画面側では判定し直さない。
- * shown が空のときは、全要因の先頭 (1位) だけを出す。
- */
-function selectShown(
-  result: DiagnosisResult,
-  shown: FactorAnalysisResponse["shown"],
-  factorMeta: readonly FactorMeta[]
-): DiagnosisResult {
-  const byId = new Map(result.factors.map((f) => [f.id, f]));
-  const factors = [...shown]
-    .sort((a, b) => a.rank - b.rank)
-    .map((s) => factorMeta[s.category_id - 1]?.id)
-    .map((id) => (id ? byId.get(id) : undefined))
-    .filter((f): f is Factor => f !== undefined);
-  return {
-    ...result,
-    factors: factors.length > 0 ? factors : result.factors.slice(0, 1),
-  };
-}
-
-/**
- * 矢印の意味を伝える説明 (凡例 + つながりごとの文) を構築する。
- * 実線は調査で確認できたつながり、点線は可能性があるつながり。
- */
-function buildLinkNotes(links: readonly MapLink[]): HTMLElement {
-  const box = document.createElement("div");
-  box.className = "result-view__links";
-
-  const list = document.createElement("ul");
-  list.className = "result-view__links-list";
-  for (const link of links) {
-    const item = document.createElement("li");
-    item.className = `result-view__link result-view__link--${link.status}`;
-    item.dataset.from = link.from;
-    item.dataset.to = link.to;
-    item.textContent = `${link.status === "confirmed" ? "→" : "⇢"} ${link.message}`;
-    list.appendChild(item);
-  }
-  box.appendChild(list);
-
-  const legend = document.createElement("p");
-  legend.className = "result-view__links-legend";
-  legend.textContent = "実線は調査で確かめられたつながり、点線はそうなる可能性があるつながりです。";
-  box.appendChild(legend);
 
   return box;
 }
@@ -297,12 +265,6 @@ function buildLinkNotes(links: readonly MapLink[]): HTMLElement {
 // ResultView ファクトリ
 // ============================================================
 
-/**
- * createResultView: 診断結果・要因詳細画面を生成する。
- *
- * @param container 描画先コンテナ。enter() のたびに内容を再構築する。
- * @param deps      依存一式 (store / diagnose / apiClient / mapRenderer など)。
- */
 /** 結果が出せないときの表示 (再試行 or やり直し)。 */
 function renderMessage(
   container: HTMLElement,
@@ -325,6 +287,12 @@ function renderMessage(
   container.appendChild(root);
 }
 
+/**
+ * createResultView: 診断結果・要因詳細画面を生成する。
+ *
+ * @param container 描画先コンテナ。enter() のたびに内容を再構築する。
+ * @param deps      依存一式 (store / typeCatalog / apiClient / mapRenderer など)。
+ */
 export function createResultView(
   container: HTMLElement,
   deps: ResultViewDeps
@@ -334,6 +302,7 @@ export function createResultView(
       const {
         store,
         factorMeta,
+        typeCatalog,
         apiClient,
         mapRenderer,
         getDiagnosisId,
@@ -379,20 +348,16 @@ export function createResultView(
       }
 
       const result = toDiagnosisResult(res.data, factorMeta);
+      const display = toResultDisplay(res.data, result, factorMeta);
 
-      // 画面に出す要因は、バックエンドが返した shown (順位順、最大4つ) に従う。
-      // 目立ったもやもやが無い場合 (low_moyamoya) は、全要因をそのまま出す。
-      const lowMoyamoya = res.data.low_moyamoya;
-      const displayResult: DiagnosisResult = lowMoyamoya
-        ? result
-        : selectShown(result, res.data.shown, factorMeta);
-      // 画面に出ている要因どうしを結ぶ、調査の根拠があるつながりだけを描く。
-      const links = lowMoyamoya
-        ? []
-        : linksAmong(displayResult.factors.map((f) => f.id));
-
-      // 再表示用キーへ保持する (F-25 / Req 17.2)。画面に出した内容と同じものを残す。
-      persistResult(displayResult);
+      // 要因詳細の見出しに添える単独タイプ名 (types.json の 1つのタイプ)。
+      const withTypeName = (f: Factor): Factor => {
+        const c = categoryIdOfFactor(f.id);
+        const name = c !== undefined ? typeCatalog.get(typeIdOf([c]))?.name : undefined;
+        return name ? { ...f, typeName: name } : f;
+      };
+      const circles = display.circles.map(withTypeName);
+      const typeFactorIds = display.typeFactors.map((f) => f.id);
 
       container.replaceChildren();
 
@@ -405,37 +370,45 @@ export function createResultView(
       title.textContent = "診断結果";
       root.appendChild(title);
 
-      if (lowMoyamoya) {
+      // 全部0点: タイプも円も無い。
+      if (display.typeId === null) {
         const note = document.createElement("p");
-        note.className = "view__lead result-view__low";
-        note.textContent =
-          "いまは、目立って大きいもやもやは見つかりませんでした。下の図は、それぞれの要因の大きさの目安です。";
+        note.className = "view__lead result-view__none";
+        note.textContent = NO_MOYAMOYA_MESSAGE;
         root.appendChild(note);
       } else {
-        // 見出し: 表示する要因の組み合わせから判定したタイプ名 (主役はマップ)。
-        const type = classifyType(displayResult.factors);
-        if (type) {
-          root.appendChild(buildTypeHeadline(type, result.factors));
+        // もやもやが少ない人: タイプ (1つ) に一言を添える。
+        if (display.lowMoyamoya) {
+          const note = document.createElement("p");
+          note.className = "view__lead result-view__low";
+          note.textContent = LOW_MOYAMOYA_MESSAGE;
+          root.appendChild(note);
+        }
+
+        // 見出し: タイプ名＋ひとこと解説 (主役はマップ)。
+        // types.json は起動時に175件そろっていることを確かめているので、通常は必ず見つかる。
+        const entry = typeCatalog.get(display.typeId);
+        if (entry) {
+          root.appendChild(buildTypeHeadline(display.typeId, entry, display.typeFactors));
+        } else {
+          console.error(`types.json にタイプID ${display.typeId} がありません`);
         }
       }
 
-      // マップ描画先。
+      // マップ描画先 (円が無いときは出さない)。
       const mapContainer = document.createElement("div");
       mapContainer.className = "result-view__map";
-      root.appendChild(mapContainer);
+      if (circles.length > 0) root.appendChild(mapContainer);
 
-      // つながりの説明 (矢印の意味)。
-      if (links.length > 0) {
-        root.appendChild(buildLinkNotes(links));
+      // 要因詳細 (円に出した要因)。
+      if (circles.length > 0) {
+        const detailsContainer = document.createElement("div");
+        detailsContainer.className = "result-view__details";
+        detailsContainer.appendChild(
+          buildFactorDetails(circles, result.topFactorId, new Set(typeFactorIds), result.factors)
+        );
+        root.appendChild(detailsContainer);
       }
-
-      // 要因詳細。
-      const detailsContainer = document.createElement("div");
-      detailsContainer.className = "result-view__details";
-      detailsContainer.appendChild(
-        buildFactorDetails(displayResult, result.factors)
-      );
-      root.appendChild(detailsContainer);
 
       // 事後アンケートへの導線。
       const nextButton = document.createElement("button");
@@ -447,8 +420,21 @@ export function createResultView(
 
       container.appendChild(root);
 
-      // 診断マップを描画する (Req 10.1)。
-      mapRenderer.render(mapContainer, displayResult, { links });
+      if (circles.length > 0) {
+        const displayResult: DiagnosisResult = {
+          ...result,
+          factors: circles,
+          typeFactorIds,
+        };
+        // 再表示用キーへ保持する (F-25 / Req 17.2)。画面に出した内容と同じものを残す。
+        persistResult(displayResult);
+
+        // 診断マップを描画する (Req 10.1)。タイプの円は色を変え、タイプの要因どうしを線で結ぶ。
+        mapRenderer.render(mapContainer, displayResult, {
+          links: display.lines,
+          highlightIds: typeFactorIds,
+        });
+      }
     },
   };
   return view;
