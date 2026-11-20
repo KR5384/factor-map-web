@@ -23,6 +23,8 @@
 import type { DiagnosisResult, Factor } from "@/models/types";
 import { SCORE_MAX, SCORE_MIN } from "@/models/types";
 import type { MapRenderer } from "@/views/mapRenderer";
+import { selectDisplayFactors } from "@/engine/displayFilter";
+import { linksAmong } from "@/engine/factorLinks";
 
 // ============================================================
 // 保持キー
@@ -103,6 +105,8 @@ function validateFactor(raw: unknown): Factor | null {
   return {
     id: f.id,
     label: f.label,
+    // typeName は任意項目。文字列のときだけ引き継ぐ (旧データには無い)。
+    ...(isNonEmptyString(f.typeName) ? { typeName: f.typeName } : {}),
     score: f.score,
     description: f.description,
     relatedFactorIds: [...f.relatedFactorIds],
@@ -253,7 +257,15 @@ export function createResultReplay(deps: ResultReplayDeps): ResultReplay {
       // 妥当なら保持された並び順・topFactorId でマップを再描画する (Req 17.2)。
       // MapRenderer は与えられた DiagnosisResult から決定的に描画するため、
       // 保持値の factors 並び順と topFactorId がそのままマップへ反映される。
-      mapRenderer.render(getMapContainer(), result);
+      // 結果画面と同じ見え方にするため、同じ表示ボーダーで絞り込み、
+      // 画面に出る要因どうしの根拠のあるつながりを矢印で描く。
+      // 絞り込みは並び順を保つので、先頭 (topFactorId) も変わらない。
+      const displayResult: DiagnosisResult = {
+        ...result,
+        factors: selectDisplayFactors(result.factors),
+      };
+      const links = linksAmong(displayResult.factors.map((f) => f.id));
+      mapRenderer.render(getMapContainer(), displayResult, { links });
       return true;
     },
   };

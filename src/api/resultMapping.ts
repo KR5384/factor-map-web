@@ -8,6 +8,7 @@
 import type { FactorMeta } from "@/engine/diagnose";
 import type { DiagnosisResult, Factor } from "@/models/types";
 import type { FactorAnalysisResponse } from "@/api/apiClient";
+import { singleTypeName } from "@/engine/typeCatalog";
 
 /** 分類ID 1〜10 の順の要因ID (バックエンドと共通) */
 export const FACTOR_ORDER = [
@@ -41,9 +42,12 @@ export function toDiagnosisResult(res: FactorAnalysisResponse, factorMeta: Facto
   const ordered = [...res.scores].sort((a, b) => b.score - a.score || a.category_id - b.category_id);
   const factors: Factor[] = ordered.map((s) => {
     const meta = metaOf(s.category_id);
+    // 単独タイプ名は moyamoya_175types.csv が正。
+    const typeName = singleTypeName(meta.id);
     return {
       id: meta.id,
       label: meta.label,
+      ...(typeName !== undefined ? { typeName } : {}),
       score: s.score,
       description: meta.description,
       relatedFactorIds: meta.relatedFactorIds,

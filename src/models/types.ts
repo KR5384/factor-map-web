@@ -51,6 +51,8 @@ export interface Factor {
   id: string;
   /** 表示名 (例: "働きすぎ") */
   label: string;
+  /** タイプ名 (例: "アタマの中が大渋滞")。結果画面の見出しに用いる。任意 */
+  typeName?: string;
   /** 0..100 に正規化した重み付けスコア */
   score: number;
   /** F-13 要因詳細の説明文 */

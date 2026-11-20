@@ -95,6 +95,11 @@ export function createQuestionsView(
    * - 未回答強調時の案内メッセージ
    */
   function render(): void {
+    // すでに質問画面が表示されていれば再描画 (選択・前へ・次へ等)。
+    // 画面の表示アニメーション (フェードイン) は初回表示のときだけにし、
+    // 再描画では止める。止めないと選択のたびに画面が白くちらつく。
+    const isRerender = container.querySelector(":scope > .questions-view") !== null;
+
     container.replaceChildren();
 
     const question = currentQuestion();
@@ -104,7 +109,9 @@ export function createQuestionsView(
     }
 
     const root = document.createElement("section");
-    root.className = "questions-view";
+    root.className = isRerender
+      ? "questions-view questions-view--rerender"
+      : "questions-view";
     root.setAttribute("aria-label", "診断の質問");
 
     root.appendChild(createProgress());
