@@ -86,6 +86,17 @@ describe("結果画面", () => {
     expect(top.querySelector(".bubble__label")?.textContent).toBe("情報過多");
     expect(top.querySelector(".bubble__score")?.textContent).toBe("82");
     expect(root.querySelectorAll(".factor-details > li")).toHaveLength(5);
+    // 画面の主見出しは h1。タイプの要因には文字の印も付ける (色だけに頼らない)。
+    expect(text(root, "h1")).toBe("診断結果");
+    expect(root.querySelectorAll(".factor__type-tag")).toHaveLength(2);
+    expect(root.querySelector(".moyamoya-map")?.getAttribute("aria-label")).toContain(
+      "タイプを決めた要因は 情報過多/認知負荷、反すう/考え続ける状態。"
+    );
+    // 要因詳細の見出しは「表示名（タイプ名）」。括弧を二重にしない。
+    const heading = root.querySelector('.factor[data-factor-id="info_overload"] .factor__label')!;
+    expect(heading.firstChild?.textContent).toBe(
+      `情報過多/認知負荷（${typeCatalog.get("03")!.name}）`
+    );
     expect(root.querySelector(".result-view__low")).toBeNull();
   });
 

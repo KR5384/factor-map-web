@@ -40,6 +40,73 @@ import { createResultView } from "@/views/resultView";
 import { renderPostSurveyView } from "@/views/postSurveyView";
 import { renderCompleteView } from "@/views/completeView";
 import type { QuestionId } from "@/models/types";
+import { focusViewHeading } from "@/views/a11y";
+
+// ============================================================
+// 画面ごとのページタイトルとステップ表示
+// ============================================================
+
+const APP_NAME = "もやもや診断";
+
+/** 画面ごとのページタイトル (タブ名・読み上げで今いる画面が分かるように)。 */
+const PAGE_TITLES: Record<ViewName, string> = {
+  top: APP_NAME,
+  about: "アプリの説明",
+  consent: "利用同意",
+  preSurvey: "事前アンケート",
+  questions: "質問に答える",
+  result: "診断結果",
+  postSurvey: "事後アンケート",
+  complete: "診断が完了しました",
+};
+
+/** ステップ表示に出す画面の並び (トップと完了画面には出さない)。 */
+const FLOW_STEPS: readonly ViewName[] = [
+  "about",
+  "consent",
+  "preSurvey",
+  "questions",
+  "result",
+  "postSurvey",
+];
+
+/**
+ * renderFlowStep: 「STEP 3 / 6　事前アンケート」と進み具合のバーを出す。
+ * 対象外の画面では隠す。バーは文字と同じ内容なので読み上げない。
+ */
+function renderFlowStep(view: ViewName): void {
+  const el = document.getElementById("flow-step");
+  if (!el) return;
+  const index = FLOW_STEPS.indexOf(view);
+  if (index === -1) {
+    el.hidden = true;
+    el.replaceChildren();
+    return;
+  }
+
+  const text = document.createElement("p");
+  text.className = "flow-step__text";
+  const count = document.createElement("span");
+  count.className = "flow-step__count";
+  count.textContent = `STEP ${index + 1} / ${FLOW_STEPS.length}`;
+  const name = document.createElement("span");
+  name.className = "flow-step__name";
+  name.textContent = PAGE_TITLES[view];
+  text.append(count, name);
+
+  const bar = document.createElement("ol");
+  bar.className = "flow-step__bar";
+  bar.setAttribute("aria-hidden", "true");
+  FLOW_STEPS.forEach((_, i) => {
+    const seg = document.createElement("li");
+    seg.className =
+      i < index ? "flow-step__seg is-done" : i === index ? "flow-step__seg is-current" : "flow-step__seg";
+    bar.appendChild(seg);
+  });
+
+  el.replaceChildren(text, bar);
+  el.hidden = false;
+}
 
 // ============================================================
 // questions.json のスキーマ
@@ -209,6 +276,22 @@ async function bootstrap(): Promise<void> {
   // onNavigate は後で代入するため、クロージャ経由で router を参照できるようにする。
   let router: Router;
 
+  /**
+   * 画面を描き、ページタイトル・ステップ表示を合わせる。
+   * 画面を切り替えたとき (初回表示以外) は先頭に戻し、見出しへフォーカスを移して
+   * 新しい画面の先頭から読み上げられるようにする。
+   * 診断結果画面は結果を受け取ってから見出しを描くので、フォーカスは画面側で移す。
+   */
+  const showView = (view: ViewName, isFirst = false): void => {
+    document.title = view === "top" ? APP_NAME : `${PAGE_TITLES[view]}｜${APP_NAME}`;
+    renderFlowStep(view);
+    renderView(view);
+    if (!isFirst) {
+      window.scrollTo({ top: 0 });
+      focusViewHeading(app);
+    }
+  };
+
   const renderView = (view: ViewName): void => {
     switch (view) {
       case "top":
@@ -313,12 +396,12 @@ async function bootstrap(): Promise<void> {
     },
     initial: "top",
     onNavigate: (view) => {
-      renderView(view);
+      showView(view);
     },
   });
 
   // ---- 5. 初期画面を描画して起動フローを開始する (Top) ----
-  renderView(router.current());
+  showView(router.current(), true);
 }
 
 /** 致命的エラー時のフォールバック表示。 */

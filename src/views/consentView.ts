@@ -110,6 +110,15 @@ export function renderConsentView(
   confirmButton.dataset.action = "confirm-consent";
   confirmButton.textContent = "決定";
   confirmButton.disabled = true;
+
+  // 無効なボタンだけでは押せない理由が分からないので、案内を添える。
+  const hint = document.createElement("p");
+  hint.id = "consent-hint";
+  hint.className = "consent__hint";
+  hint.textContent = "どちらかを選ぶと「決定」を押せます。";
+  confirmButton.setAttribute("aria-describedby", hint.id);
+
+  section.appendChild(hint);
   section.appendChild(confirmButton);
 
   const getSelected = (): ConsentChoice | undefined => {
@@ -121,6 +130,9 @@ export function renderConsentView(
   const onChoiceChange = (): void => {
     // いずれかが選択されたら確定ボタンを有効化する。
     confirmButton.disabled = getSelected() === undefined;
+    hint.hidden = !confirmButton.disabled;
+    if (confirmButton.disabled) confirmButton.setAttribute("aria-describedby", hint.id);
+    else confirmButton.removeAttribute("aria-describedby");
   };
   agreeRadio.input.addEventListener("change", onChoiceChange);
   declineRadio.input.addEventListener("change", onChoiceChange);

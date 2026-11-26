@@ -351,7 +351,7 @@ export function renderMap(
   svg.setAttribute("height", String(layout.height));
   svg.setAttribute("viewBox", `0 0 ${layout.width} ${layout.height}`);
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "診断マップ");
+  svg.setAttribute("aria-label", describeMap(result.factors, options.highlightIds ?? []));
   svg.dataset.bubbleCount = String(layout.bubbles.length);
 
   // 線はバブルの下に描く (先に追加した要素が下になる)。
@@ -383,6 +383,19 @@ function createLinkLine(seg: LinkSegment): SVGLineElement {
   line.dataset.from = seg.link.from;
   line.dataset.to = seg.link.to;
   return line;
+}
+
+/**
+ * describeMap: マップの代替テキスト。
+ * role="img" の SVG は中の文字が読み上げられないので、円の内容 (要因と点数) と
+ * どれがタイプの要因かを文章にして aria-label に入れる。
+ */
+export function describeMap(factors: readonly Factor[], highlightIds: readonly string[]): string {
+  const items = factors.map((f) => `${f.label} ${formatScore(f.score)}点`).join("、");
+  const highlight = new Set(highlightIds);
+  const typeLabels = factors.filter((f) => highlight.has(f.id)).map((f) => f.label);
+  const typePart = typeLabels.length > 0 ? `タイプを決めた要因は ${typeLabels.join("、")}。` : "";
+  return `診断マップ。${items}。${typePart}`;
 }
 
 /** 点数の表示 (整数に丸める)。 */

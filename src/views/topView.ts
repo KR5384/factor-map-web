@@ -54,6 +54,29 @@ export function renderTopView(
     "20問の質問に答えると、あなたの心のもやもやの要因を診断マップで可視化します。";
   section.appendChild(lead);
 
+  // 始める前に知りたいこと (所要時間・問題数・匿名) を短く並べる。
+  // 所要時間は【仮】(事前・事後アンケート各約1分＋20問からの見積もり)。
+  const facts = document.createElement("ul");
+  facts.className = "top-facts";
+  facts.setAttribute("aria-label", "診断の概要");
+  for (const [term, detail] of [
+    ["所要時間", "約5分"],
+    ["質問", "20問"],
+    ["回答", "匿名"],
+  ] as const) {
+    const item = document.createElement("li");
+    item.className = "top-facts__item";
+    const t = document.createElement("span");
+    t.className = "top-facts__term";
+    t.textContent = term;
+    const d = document.createElement("span");
+    d.className = "top-facts__detail";
+    d.textContent = detail;
+    item.append(t, d);
+    facts.appendChild(item);
+  }
+  section.appendChild(facts);
+
   // 診断開始への導線 (Req 1.2): 有効状態 (disabled を付与しない) で生成する。
   const startButton = document.createElement("button");
   startButton.type = "button";

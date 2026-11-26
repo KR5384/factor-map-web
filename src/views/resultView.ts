@@ -39,6 +39,7 @@ import {
 } from "@/api/resultMapping";
 import type { MapRenderer } from "@/views/mapRenderer";
 import { persistResult } from "@/views/resultReplay";
+import { focusViewHeading } from "@/views/a11y";
 import {
   typeIdOf,
   type TypeCatalog,
@@ -161,21 +162,45 @@ function buildFactorDetails(
     const heading = document.createElement("h3");
     heading.className = "factor__label";
     heading.textContent = factor.typeName
-      ? `${factor.label}（『${factor.typeName}』）`
+      ? `${factor.label}（${factor.typeName}）`
       : factor.label;
-    if (isTop) {
-      heading.dataset.top = "true";
-      heading.setAttribute("aria-label", `${factor.label}（最大要因）`);
-      const badge = document.createElement("span");
-      badge.className = "factor__top-badge";
-      badge.textContent = "最大要因";
-      heading.appendChild(badge);
-    }
+    if (isTop) heading.dataset.top = "true";
     item.appendChild(heading);
 
-    const score = document.createElement("p");
+    // 印: 最大要因 / タイプの要因 (マップで線で結んだ円)。色だけでなく文字でも示す。
+    const isType = typeFactorIds.has(factor.id);
+    if (isTop || isType) {
+      const tags = document.createElement("p");
+      tags.className = "factor__tags";
+      if (isTop) {
+        const badge = document.createElement("span");
+        badge.className = "factor__top-badge";
+        badge.textContent = "最大要因";
+        tags.appendChild(badge);
+      }
+      if (isType) {
+        const typeTag = document.createElement("span");
+        typeTag.className = "factor__type-tag";
+        typeTag.textContent = "タイプの要因";
+        tags.appendChild(typeTag);
+      }
+      item.appendChild(tags);
+    }
+
+    // スコアは文字で示し、横のバーは同じ内容の見た目の補助 (読み上げない)。
+    const score = document.createElement("div");
     score.className = "factor__score";
-    score.textContent = `スコア: ${factor.score}`;
+    const scoreText = document.createElement("p");
+    scoreText.className = "factor__score-text";
+    scoreText.textContent = `スコア ${Math.round(factor.score)} / 100`;
+    const meter = document.createElement("div");
+    meter.className = "factor__meter";
+    meter.setAttribute("aria-hidden", "true");
+    const meterFill = document.createElement("div");
+    meterFill.className = "factor__meter-fill";
+    meterFill.style.width = `${Math.max(0, Math.min(100, factor.score))}%`;
+    meter.appendChild(meterFill);
+    score.append(scoreText, meter);
     item.appendChild(score);
 
     // 説明文は常に表示する (Req 11.1 / 11.4)。
@@ -269,16 +294,46 @@ function renderMessage(
   container.replaceChildren();
   const root = document.createElement("section");
   root.className = "result-view result-view--message";
-  root.setAttribute("role", "alert");
+  root.setAttribute("aria-labelledby", "result-title");
+  const title = buildTitle();
   const p = document.createElement("p");
-  p.className = "view__lead";
+  p.className = "view__lead result-view__error";
+  p.setAttribute("role", "alert");
   p.textContent = message;
   const button = document.createElement("button");
   button.type = "button";
   button.className = "button button--primary";
   button.textContent = action.label;
   button.addEventListener("click", action.onClick);
-  root.append(p, button);
+  root.append(title, p, button);
+  container.appendChild(root);
+  focusViewHeading(container);
+}
+
+/** 画面の主見出し「診断結果」。 */
+function buildTitle(): HTMLHeadingElement {
+  const title = document.createElement("h1");
+  title.id = "result-title";
+  title.className = "result-view__title";
+  title.textContent = "診断結果";
+  return title;
+}
+
+/** 採点を待つ間の表示。見出しを先に出しておき、画面に入った直後から読み上げられるようにする。 */
+function renderLoading(container: HTMLElement): void {
+  container.replaceChildren();
+  const root = document.createElement("section");
+  root.className = "result-view result-view--loading";
+  root.setAttribute("aria-labelledby", "result-title");
+  root.setAttribute("aria-busy", "true");
+  const status = document.createElement("p");
+  status.className = "view__lead result-view__loading";
+  status.setAttribute("role", "status");
+  const spinner = document.createElement("span");
+  spinner.className = "spinner";
+  spinner.setAttribute("aria-hidden", "true");
+  status.append(spinner, document.createTextNode("診断しています…"));
+  root.append(buildTitle(), status);
   container.appendChild(root);
 }
 
@@ -320,12 +375,7 @@ export function createResultView(
         return;
       }
 
-      container.replaceChildren();
-      const loading = document.createElement("p");
-      loading.className = "view__lead";
-      loading.setAttribute("role", "status");
-      loading.textContent = "診断しています…";
-      container.appendChild(loading);
+      renderLoading(container);
 
       // バックエンドで採点する (API-02)。同じ回答の再送信には保存済みの結果が返る。
       const res = await apiClient.postDiagnosis({ diagnosisId, answers });
@@ -358,12 +408,8 @@ export function createResultView(
 
       const root = document.createElement("section");
       root.className = "result-view";
-      root.setAttribute("aria-label", "診断結果");
-
-      const title = document.createElement("h2");
-      title.className = "result-view__title";
-      title.textContent = "診断結果";
-      root.appendChild(title);
+      root.setAttribute("aria-labelledby", "result-title");
+      root.appendChild(buildTitle());
 
       // 全部0点: タイプも円も無い。
       if (display.typeId === null) {
@@ -393,12 +439,28 @@ export function createResultView(
       // マップ描画先 (円が無いときは出さない)。
       const mapContainer = document.createElement("div");
       mapContainer.className = "result-view__map";
-      if (circles.length > 0) root.appendChild(mapContainer);
+      if (circles.length > 0) {
+        root.appendChild(mapContainer);
+        // マップの読み方。「線で結んだ」と書き、色だけに頼らない。
+        const legend = document.createElement("p");
+        legend.className = "result-view__map-legend";
+        legend.textContent =
+          typeFactorIds.length >= 2
+            ? "線で結んだオレンジの円が、タイプを決めた要因です。円が大きいほどスコアが高い要因です。"
+            : "オレンジの円が、タイプを決めた要因です。円が大きいほどスコアが高い要因です。";
+        root.appendChild(legend);
+      }
 
       // 要因詳細 (円に出した要因)。
       if (circles.length > 0) {
-        const detailsContainer = document.createElement("div");
+        const detailsContainer = document.createElement("section");
         detailsContainer.className = "result-view__details";
+        detailsContainer.setAttribute("aria-labelledby", "result-details-title");
+        const detailsTitle = document.createElement("h2");
+        detailsTitle.id = "result-details-title";
+        detailsTitle.className = "result-view__section-title";
+        detailsTitle.textContent = "要因の詳しい説明";
+        detailsContainer.appendChild(detailsTitle);
         detailsContainer.appendChild(
           buildFactorDetails(circles, result.topFactorId, new Set(typeFactorIds), result.factors)
         );
@@ -406,12 +468,18 @@ export function createResultView(
       }
 
       // 事後アンケートへの導線。
+      const next = document.createElement("div");
+      next.className = "result-view__actions";
+      const nextNote = document.createElement("p");
+      nextNote.className = "result-view__actions-note";
+      nextNote.textContent = "最後に、事後アンケート（約1分）にご協力ください。";
       const nextButton = document.createElement("button");
       nextButton.type = "button";
       nextButton.className = "result-view__next";
       nextButton.textContent = "事後アンケートへ進む";
       nextButton.addEventListener("click", () => navigateToPostSurvey());
-      root.appendChild(nextButton);
+      next.append(nextNote, nextButton);
+      root.appendChild(next);
 
       container.appendChild(root);
 
@@ -430,6 +498,9 @@ export function createResultView(
           highlightIds: typeFactorIds,
         });
       }
+
+      // 「診断しています…」の表示から差し替えたので、新しい見出しへフォーカスを移す。
+      focusViewHeading(container);
     },
   };
   return view;

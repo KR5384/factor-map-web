@@ -46,6 +46,9 @@ export interface QuestionsView {
   render(): void;
 }
 
+/** 再描画のあとにフォーカスを置く場所。 */
+type FocusTarget = { kind: "choice"; value: ChoiceValue } | { kind: "heading" };
+
 /** createQuestionsView の生成オプション。 */
 export interface CreateQuestionsViewOptions {
   /** 描画先コンテナ要素。 */
@@ -94,7 +97,7 @@ export function createQuestionsView(
    * - 診断する ボタン
    * - 未回答強調時の案内メッセージ
    */
-  function render(): void {
+  function render(focus?: FocusTarget): void {
     // すでに質問画面が表示されていれば再描画 (選択・前へ・次へ等)。
     // 画面の表示アニメーション (フェードイン) は初回表示のときだけにし、
     // 再描画では止める。止めないと選択のたびに画面が白くちらつく。
@@ -128,6 +131,27 @@ export function createQuestionsView(
     }
 
     container.appendChild(root);
+    restoreFocus(root, focus);
+  }
+
+  /**
+   * 再描画で消えたフォーカスを戻す。
+   * 画面を作り直すとフォーカスがページ先頭へ飛んでしまうため、
+   * 選んだ選択肢にはそのまま、質問を移ったときは新しい設問文へフォーカスを置く。
+   */
+  function restoreFocus(root: HTMLElement, focus: FocusTarget | undefined): void {
+    if (!focus) return;
+    if (focus.kind === "choice") {
+      root
+        .querySelector<HTMLElement>(`.questions-view__choice[data-value="${focus.value}"]`)
+        ?.focus();
+      return;
+    }
+    const heading = root.querySelector<HTMLElement>(".questions-view__heading");
+    if (heading) {
+      heading.tabIndex = -1;
+      heading.focus();
+    }
   }
 
   /** 進捗表示 (F-08 / Req 6.1, 6.2, 6.3) を生成する。 */
@@ -145,9 +169,10 @@ export function createQuestionsView(
 
     wrapper.appendChild(text);
 
-    // 進捗ゲージ: 回答済み割合を塗り幅で表す。
+    // 進捗ゲージ: 回答済み割合を塗り幅で表す。上の文字と同じ内容なので読み上げない。
     const bar = document.createElement("div");
     bar.className = "questions-view__progress-bar";
+    bar.setAttribute("aria-hidden", "true");
     const fill = document.createElement("div");
     fill.className = "questions-view__progress-fill";
     const ratio = progress.total > 0 ? progress.answered / progress.total : 0;
@@ -170,16 +195,22 @@ export function createQuestionsView(
       block.dataset.missing = "true";
     }
 
+    // 設問文はこの画面の主見出し (h1)。質問を移ったときはここへフォーカスを移す。
     const index = store.currentIndex();
-    const heading = document.createElement("h2");
+    const headingId = `question-heading-${question.id}`;
+    const heading = document.createElement("h1");
+    heading.id = headingId;
     heading.className = "questions-view__heading";
-    heading.textContent = `Q${index}. ${question.text}`;
+    const number = document.createElement("span");
+    number.className = "questions-view__number";
+    number.textContent = `Q${index}`;
+    heading.append(number, document.createTextNode(question.text));
     block.appendChild(heading);
 
     const choiceList = document.createElement("div");
     choiceList.className = "questions-view__choices";
     choiceList.setAttribute("role", "group");
-    choiceList.setAttribute("aria-label", `${question.text} の回答`);
+    choiceList.setAttribute("aria-labelledby", headingId);
 
     const selected = store.getAnswer(question.id);
 
@@ -214,7 +245,7 @@ export function createQuestionsView(
       // 回答を保持する (Req 5.1)。選択後は強調を解除して再描画する。
       store.setAnswer(questionId, value);
       missingHighlights = new Set<QuestionId>();
-      render();
+      render({ kind: "choice", value });
     });
 
     return button;
@@ -235,26 +266,35 @@ export function createQuestionsView(
     prevButton.disabled = index <= 1;
     prevButton.addEventListener("click", () => {
       store.gotoPrev();
-      render();
+      render({ kind: "heading" });
     });
     controls.appendChild(prevButton);
 
     // 次へ (Req 7.1 / 7.3): 末尾 (20) では無効化する。
+    // 表示中の質問に答えたら、次に押すボタンとして目立たせる。
+    const question = currentQuestion();
+    const answered = question !== undefined && store.getAnswer(question.id) !== undefined;
     const nextButton = document.createElement("button");
     nextButton.type = "button";
-    nextButton.className = "questions-view__next";
+    nextButton.className = answered
+      ? "questions-view__next questions-view__next--ready"
+      : "questions-view__next";
     nextButton.textContent = "次へ";
     nextButton.disabled = index >= store.progress().total;
     nextButton.addEventListener("click", () => {
       store.gotoNext();
-      render();
+      render({ kind: "heading" });
     });
     controls.appendChild(nextButton);
 
     // 診断する (Req 8.3 / 8.4): 必須チェックを実行して遷移制御する。
+    // すべて答えるまでは控えめに、答え終わったら主ボタンとして目立たせる。
+    const allAnswered = store.progress().remaining === 0;
     const diagnoseButton = document.createElement("button");
     diagnoseButton.type = "button";
-    diagnoseButton.className = "questions-view__diagnose";
+    diagnoseButton.className = allAnswered
+      ? "questions-view__diagnose questions-view__diagnose--ready"
+      : "questions-view__diagnose";
     diagnoseButton.textContent = "診断する";
     diagnoseButton.addEventListener("click", () => {
       handleDiagnose();
@@ -282,7 +322,7 @@ export function createQuestionsView(
       if (firstMissingIndex !== -1) {
         moveToIndex(firstMissingIndex + 1);
       }
-      render();
+      render({ kind: "heading" });
       return;
     }
 

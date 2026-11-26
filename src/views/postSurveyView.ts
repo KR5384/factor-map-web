@@ -14,7 +14,12 @@ import {
   type Group,
   type PostSurveyInput,
 } from "@/store/surveyStore";
-import { createRadioGroup, createTextArea, highlightFields } from "@/views/surveyFields";
+import {
+  createRadioGroup,
+  createTextArea,
+  focusFirstInvalid,
+  highlightFields,
+} from "@/views/surveyFields";
 
 export interface PostSurveyViewOptions {
   apiClient: ApiClient;
@@ -48,6 +53,11 @@ export function renderPostSurveyView(container: HTMLElement, options: PostSurvey
       ? "診断結果を見たうえで、いまのあなたの状態についてもう一度教えてください（約1分）。診断前と同じ質問もありますが、いまの気持ちで答えてください。"
       : "いまのあなたの状態について、もう一度教えてください（約1分）。診断前と同じ質問もありますが、いまの気持ちで答えてください。";
   section.appendChild(lead);
+
+  const requiredNote = document.createElement("p");
+  requiredNote.className = "survey__required-note";
+  requiredNote.textContent = "「（任意）」と書いた項目のほかは、すべてお答えください。";
+  section.appendChild(requiredNote);
 
   const form = document.createElement("form");
   form.className = "survey__form";
@@ -122,7 +132,8 @@ export function renderPostSurveyView(container: HTMLElement, options: PostSurvey
     const invalid = validatePostSurvey(input, group);
     highlightFields(form, invalid);
     if (invalid.length > 0) {
-      showError("未回答の項目があります。色の付いた項目を確認してください。");
+      showError(`未回答の項目が ${invalid.length} 件あります。「選んでください」と表示された項目に答えてください。`);
+      focusFirstInvalid(form);
       return;
     }
     showError("");

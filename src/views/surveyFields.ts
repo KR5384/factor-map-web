@@ -17,6 +17,7 @@ export function createRadioGroup<T extends string | number>(opts: {
   optional?: boolean;
 }): HTMLFieldSetElement {
   const fieldset = createFieldset(opts.field, opts.legend, opts.optional);
+  fieldset.dataset.errorMessage = "1つ選んでください";
   for (const option of opts.options) {
     const label = document.createElement("label");
     label.className = "survey__choice";
@@ -26,7 +27,7 @@ export function createRadioGroup<T extends string | number>(opts: {
     input.value = String(option.value);
     input.addEventListener("change", () => {
       if (!input.checked) return;
-      fieldset.classList.remove(INVALID_CLASS);
+      setFieldInvalid(fieldset, false);
       opts.onSelect(option.value);
     });
     const text = document.createElement("span");
@@ -49,6 +50,7 @@ export function createCheckboxGroup(opts: {
   onToggle: (value: number, checked: boolean) => number[];
 }): HTMLFieldSetElement {
   const fieldset = createFieldset(opts.field, opts.legend);
+  fieldset.dataset.errorMessage = "1つ以上選んでください";
   if (opts.note) {
     const note = document.createElement("p");
     note.className = "survey__note";
@@ -63,7 +65,7 @@ export function createCheckboxGroup(opts: {
     input.type = "checkbox";
     input.value = String(option.value);
     input.addEventListener("change", () => {
-      fieldset.classList.remove(INVALID_CLASS);
+      setFieldInvalid(fieldset, false);
       const selected = new Set(opts.onToggle(option.value, input.checked));
       for (const el of inputs) el.checked = selected.has(Number(el.value));
     });
@@ -96,22 +98,57 @@ export function createTextArea(opts: {
   textarea.rows = 4;
   textarea.maxLength = opts.maxLength;
   textarea.addEventListener("input", () => {
-    fieldset.classList.remove(INVALID_CLASS);
+    setFieldInvalid(fieldset, false);
     opts.onInput(textarea.value);
   });
   fieldset.appendChild(textarea);
   return fieldset;
 }
 
-/** 指定した項目だけを強調表示する */
+/** 項目ごとのエラー文の要素のクラス名。 */
+const FIELD_ERROR_CLASS = "survey__field-error";
+
+/**
+ * 指定した項目だけを強調表示する。
+ *
+ * 色だけに頼らないよう、強調した項目には「1つ選んでください」などの文を出し、
+ * aria-describedby で項目に結び付けて読み上げられるようにする。
+ */
 export function highlightFields(form: HTMLElement, fields: string[]): void {
   const set = new Set(fields);
   form.querySelectorAll<HTMLElement>(".survey__field").forEach((el) => {
-    const invalid = set.has(el.dataset.field ?? "");
-    el.classList.toggle(INVALID_CLASS, invalid);
-    if (invalid) el.setAttribute("aria-invalid", "true");
-    else el.removeAttribute("aria-invalid");
+    setFieldInvalid(el, set.has(el.dataset.field ?? ""));
   });
+}
+
+/** 強調した項目のうち最初のものの、最初の入力欄へフォーカスを移す。 */
+export function focusFirstInvalid(form: HTMLElement): void {
+  form
+    .querySelector<HTMLElement>(`.${INVALID_CLASS} input, .${INVALID_CLASS} textarea`)
+    ?.focus();
+}
+
+/** 1つの項目の強調とエラー文を付け外しする。 */
+function setFieldInvalid(fieldset: HTMLElement, invalid: boolean): void {
+  fieldset.classList.toggle(INVALID_CLASS, invalid);
+  const errorId = `${fieldset.dataset.field ?? "field"}-error`;
+  let message = fieldset.querySelector<HTMLElement>(`.${FIELD_ERROR_CLASS}`);
+  if (!invalid) {
+    message?.remove();
+    fieldset.removeAttribute("aria-describedby");
+    fieldset.querySelectorAll("input, textarea").forEach((i) => i.removeAttribute("aria-invalid"));
+    return;
+  }
+  if (!message) {
+    message = document.createElement("p");
+    message.className = FIELD_ERROR_CLASS;
+    message.id = errorId;
+    message.textContent = fieldset.dataset.errorMessage ?? "この項目に答えてください";
+    // legend のすぐ後ろ (選択肢の前) に置き、見落とされないようにする。
+    fieldset.querySelector("legend")?.after(message);
+  }
+  fieldset.setAttribute("aria-describedby", errorId);
+  fieldset.querySelectorAll("input, textarea").forEach((i) => i.setAttribute("aria-invalid", "true"));
 }
 
 function createFieldset(field: string, legendText: string, optional = false): HTMLFieldSetElement {
@@ -120,7 +157,13 @@ function createFieldset(field: string, legendText: string, optional = false): HT
   fieldset.dataset.field = field;
   const legend = document.createElement("legend");
   legend.className = "survey__legend";
-  legend.textContent = optional ? `${legendText}（任意）` : legendText;
+  legend.textContent = legendText;
+  if (optional) {
+    const tag = document.createElement("span");
+    tag.className = "survey__optional";
+    tag.textContent = "（任意）";
+    legend.appendChild(tag);
+  }
   fieldset.appendChild(legend);
   return fieldset;
 }

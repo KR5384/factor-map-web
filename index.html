@@ -3,10 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>もやもや診断アプリ</title>
+    <meta name="color-scheme" content="light" />
+    <meta name="description" content="20問の質問に答えて、心のもやもやの要因をマップで見える化する診断です。" />
+    <title>もやもや診断</title>
   </head>
   <body>
-    <div id="app"></div>
+    <main class="app-shell">
+      <!-- いまどのステップにいるか (main.ts が画面ごとに書き換える) -->
+      <div id="flow-step" class="flow-step" hidden></div>
+      <div id="app"></div>
+    </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

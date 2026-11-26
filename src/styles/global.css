@@ -2,46 +2,63 @@
  * グローバルスタイル: もやもや診断アプリ
  *
  * 全画面 (View) に共通で適用するデザイン。各 View が出力する BEM クラス
- * (view / button / survey / questions-view / factor / pre-survey / bubble など)
- * をまとめてスタイリングする。コンポーネントの TS は変更せず、本 CSS のみで
- * 見た目を統一する。
+ * (view / button / survey / questions-view / factor / bubble など) をまとめてスタイリングする。
+ *
+ * アクセシビリティ (WCAG 2.2 AA) の前提:
+ *   - 文字色と背景色のコントラストは 4.5:1 以上 (大きい文字も含めて 4.5:1 以上にそろえる)
+ *   - フォーカス枠・円の輪郭など、意味のある図形は背景と 3:1 以上
+ *   - 色だけで状態を伝えない (選択中はチェック印、エラーは文字でも示す)
+ *   - 動きを減らす設定 (prefers-reduced-motion) ではアニメーションを止める
+ *   - Windows のハイコントラスト (forced-colors) でも選択状態・フォーカスが分かる
  */
 
 /* ============================================================
    デザイントークン
    ============================================================ */
 :root {
-  /* カラー: もやもや→整理 を想起させる青緑系 */
-  --c-bg-start: #eef4f8;
-  --c-bg-end: #e6f0ef;
+  /* カラー: もやもや→整理 を想起させる青緑系。コントラスト比は白背景に対する値 */
+  --c-bg-start: #eef4f7;
+  --c-bg-end: #e7f1ef;
   --c-surface: #ffffff;
-  --c-surface-muted: #f5f8fa;
-  --c-border: #dde5ea;
-  --c-text: #26323b;
-  --c-text-muted: #5f7180;
-  --c-primary: #2f8f83;
-  --c-primary-hover: #267a70;
-  --c-primary-soft: #e0f0ed;
+  --c-surface-muted: #f4f7f9;
+  --c-border: #dbe3e9;
+  --c-border-strong: #c5d0da;
+  --c-text: #1f2a33; /* 14.6:1 */
+  --c-text-muted: #55687a; /* 5.8:1 */
+  --c-primary: #1f7a6f; /* 白文字 5.2:1 */
+  --c-primary-hover: #17635a;
+  --c-primary-soft: #e3f2ef; /* この上の --c-primary-hover は 6.1:1 */
   --c-accent: #f0a23c;
-  --c-danger: #d6453e;
-  --c-danger-soft: #fdecea;
-  --c-focus: #4aa6d6;
+  --c-accent-soft: #fde7c8;
+  --c-accent-strong: #b4560a; /* 白文字 4.9:1 */
+  --c-accent-text: #7a3f00; /* --c-accent-soft の上で 6.9:1 */
+  --c-danger: #b42318; /* --c-danger-soft の上で 6.0:1 */
+  --c-danger-soft: #fef1f0;
+  --c-focus: #1b5fa8; /* 6.5:1 */
+
+  /* 診断マップ */
+  --c-bubble: #e1e8f0;
+  --c-bubble-stroke: #8696a7; /* 3.0:1 */
+  --c-bubble-text: #44576a;
+  --c-bubble-type: #f5b27a;
+  --c-bubble-type-stroke: #c4661c; /* 4.0:1 */
+  --c-bubble-type-text: #6b3a12;
+  --c-link: #cf6a1f; /* 3.7:1 */
 
   /* タイポ */
-  --font-sans: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP",
+  --font-sans: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI",
     "Yu Gothic", Meiryo, system-ui, -apple-system, sans-serif;
 
   /* 形状・影 */
-  --radius-sm: 8px;
+  --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 20px;
-  --shadow-sm: 0 1px 2px rgba(38, 50, 59, 0.06);
-  --shadow-md: 0 8px 24px rgba(38, 50, 59, 0.1);
-  --shadow-lg: 0 16px 48px rgba(38, 50, 59, 0.14);
+  --shadow-sm: 0 1px 2px rgba(31, 42, 51, 0.06);
+  --shadow-md: 0 6px 20px rgba(31, 42, 51, 0.08);
 
   /* レイアウト */
   --maxw: 640px;
-  --space: 16px;
+  --tap: 48px; /* 押せる部分の最小の高さ */
 }
 
 /* ============================================================
@@ -59,35 +76,117 @@ body {
   padding: 0;
 }
 
+html {
+  /* 文字サイズの変更に追従させるため、基準は rem (ブラウザ設定) のまま */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   font-family: var(--font-sans);
+  font-size: 1rem;
   color: var(--c-text);
-  line-height: 1.7;
+  line-height: 1.75;
+  letter-spacing: 0.02em;
   background: linear-gradient(160deg, var(--c-bg-start), var(--c-bg-end));
   background-attachment: fixed;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  overflow-wrap: anywhere;
+}
+
+.app-shell {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: clamp(16px, 5vw, 48px) 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100vh;
 }
 
 #app {
-  max-width: var(--maxw);
-  margin: 0 auto;
-  padding: clamp(20px, 5vw, 48px) clamp(16px, 4vw, 24px);
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
 }
 
 h1,
 h2,
 h3 {
-  line-height: 1.35;
+  line-height: 1.4;
   color: var(--c-text);
+  letter-spacing: 0.01em;
 }
 
 p {
   margin: 0 0 0.75em;
+}
+
+/* スクリプトでフォーカスを移す見出しには枠を出さない (Tab で来ることはない) */
+[tabindex="-1"]:focus {
+  outline: none;
+}
+
+/* 見た目には出さず、読み上げだけさせる */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* フォーカス枠: どの部品でも同じ見え方にする (背景と 3:1 以上) */
+:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   ステップ表示 (画面の上の「STEP 3 / 6」)
+   ============================================================ */
+.flow-step {
+  padding: 0 4px;
+}
+.flow-step__text {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 6px;
+  font-size: 0.875rem;
+}
+.flow-step__count {
+  font-weight: 700;
+  color: var(--c-primary-hover);
+  letter-spacing: 0.06em;
+}
+.flow-step__name {
+  color: var(--c-text-muted);
+}
+.flow-step__bar {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.flow-step__seg {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--c-border-strong);
+}
+.flow-step__seg.is-done {
+  background: var(--c-primary);
+}
+.flow-step__seg.is-current {
+  background: var(--c-primary-hover);
+  height: 6px;
+  margin-top: -1px;
 }
 
 /* ============================================================
@@ -95,15 +194,14 @@ p {
    ============================================================ */
 .view,
 .questions-view,
-.result-view,
-.pre-survey {
+.result-view {
   background: var(--c-surface);
   border: 1px solid var(--c-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
-  padding: clamp(24px, 5vw, 40px);
+  padding: clamp(20px, 5vw, 40px);
   width: 100%;
-  animation: view-in 0.35s ease both;
+  animation: view-in 0.3s ease both;
 }
 
 /* 同じ画面内の再描画 (選択・前へ・次へ) ではフェードインを再生しない */
@@ -114,7 +212,7 @@ p {
 @keyframes view-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -123,37 +221,71 @@ p {
 }
 
 .view__title,
-.result-view__title,
-.pre-survey > h1,
-.questions-view__heading {
-  margin: 0 0 0.5em;
-  font-size: clamp(1.4rem, 4vw, 1.8rem);
-  letter-spacing: 0.01em;
+.result-view__title {
+  margin: 0 0 0.6em;
+  font-size: clamp(1.4rem, 4.5vw, 1.75rem);
+  font-weight: 800;
 }
 
-.view__lead,
-.pre-survey > p {
+.view__lead {
   color: var(--c-text-muted);
-  font-size: 1rem;
   margin-bottom: 1.5em;
 }
 
-/* トップ画面のヒーロー感を少しだけ強調 */
+/* ============================================================
+   トップ画面
+   ============================================================ */
 .view--top {
   text-align: center;
+  padding-block: clamp(32px, 8vw, 56px);
 }
 .view--top .view__title {
-  font-size: clamp(1.8rem, 6vw, 2.4rem);
+  font-size: clamp(1.9rem, 7vw, 2.5rem);
+  margin-bottom: 0.4em;
 }
+/* 「もやもや」を表す重なった円 (飾り) */
 .view--top .view__title::before {
   content: "";
   display: block;
-  width: 72px;
+  width: 96px;
   height: 72px;
-  margin: 0 auto 16px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #7fd0c4, var(--c-primary));
-  box-shadow: var(--shadow-md);
+  margin: 0 auto 20px;
+  background:
+    radial-gradient(circle at 30% 55%, var(--c-bubble-type) 0 26px, transparent 27px),
+    radial-gradient(circle at 70% 40%, #8fd1c6 0 30px, transparent 31px),
+    radial-gradient(circle at 55% 78%, var(--c-bubble) 0 16px, transparent 17px);
+}
+.view--top .view__lead {
+  max-width: 30em;
+  margin-inline: auto;
+}
+
+.top-facts {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 28px;
+  padding: 0;
+  list-style: none;
+}
+.top-facts__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 88px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--c-surface-muted);
+  border: 1px solid var(--c-border);
+}
+.top-facts__term {
+  font-size: 0.8rem;
+  color: var(--c-text-muted);
+}
+.top-facts__detail {
+  font-size: 1.1rem;
+  font-weight: 700;
 }
 
 /* ============================================================
@@ -163,91 +295,96 @@ p {
 .questions-view__prev,
 .questions-view__next,
 .questions-view__diagnose,
-.result-view__next,
-.pre-survey__submit,
-.survey__form button[type="submit"] {
+.result-view__next {
   appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--tap);
   font: inherit;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   cursor: pointer;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  padding: 12px 22px;
+  border: 2px solid var(--c-primary);
+  border-radius: 999px;
+  padding: 10px 28px;
   background: var(--c-primary);
   color: #fff;
-  transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease,
-    opacity 0.15s ease;
-  box-shadow: var(--shadow-sm);
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
 }
 
 .button:hover,
-.questions-view__diagnose:hover,
-.result-view__next:hover,
-.pre-survey__submit:hover,
-.survey__form button[type="submit"]:hover {
+.questions-view__diagnose--ready:hover,
+.questions-view__next--ready:hover,
+.result-view__next:hover {
   background: var(--c-primary-hover);
+  border-color: var(--c-primary-hover);
 }
 
 .button:active,
+.questions-view__prev:active,
+.questions-view__next:active,
 .questions-view__diagnose:active,
-.result-view__next:active,
-.pre-survey__submit:active {
+.result-view__next:active {
   transform: translateY(1px);
 }
 
-.button:focus-visible,
-button:focus-visible,
-input:focus-visible,
-textarea:focus-visible {
-  outline: 3px solid var(--c-focus);
-  outline-offset: 2px;
-}
-
-.button--primary {
-  background: var(--c-primary);
-}
-
-.button--secondary {
+/* 白地に緑の枠と文字 (控えめなボタン) */
+.button--secondary,
+.questions-view__prev,
+.questions-view__next,
+.questions-view__diagnose {
   background: var(--c-surface);
-  color: var(--c-primary);
-  border-color: var(--c-primary);
-  box-shadow: none;
+  color: var(--c-primary-hover);
 }
-.button--secondary:hover {
+.button--secondary:hover,
+.questions-view__prev:hover,
+.questions-view__next:hover,
+.questions-view__diagnose:hover {
   background: var(--c-primary-soft);
 }
 
-button:disabled {
-  opacity: 0.45;
+/* 押せないボタン: 薄くするだけでなく、破線の枠で押せないことを示す */
+button:disabled,
+button:disabled:hover {
   cursor: not-allowed;
-  box-shadow: none;
+  background: var(--c-surface-muted);
+  border-color: var(--c-border-strong);
+  border-style: dashed;
+  color: #6b7a87;
+  transform: none;
 }
 
-/* 単独ボタンは下にまとめて余白を確保 */
+/* 単独ボタンは幅を持たせて押しやすく */
 .view > .button,
-.result-view__next,
-.pre-survey__submit {
-  margin-top: 8px;
+.survey__form > .button,
+.result-view--message .button {
+  min-width: min(100%, 240px);
 }
 
 /* ============================================================
    説明画面 (about)
    ============================================================ */
 .about-section {
+  position: relative;
   background: var(--c-surface-muted);
   border: 1px solid var(--c-border);
   border-radius: var(--radius-md);
   padding: 16px 20px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
+}
+.about-section:last-of-type {
+  margin-bottom: 28px;
 }
 .about-section__heading {
-  margin: 0 0 0.4em;
-  font-size: 1.1rem;
+  margin: 0 0 0.3em;
+  font-size: 1.05rem;
   color: var(--c-primary-hover);
 }
 .about-section__body {
   margin: 0;
-  color: var(--c-text-muted);
+  color: var(--c-text);
 }
 
 /* ============================================================
@@ -258,140 +395,202 @@ button:disabled {
   border-left: 4px solid var(--c-primary);
   border-radius: var(--radius-sm);
   padding: 14px 18px;
-  color: var(--c-text-muted);
+  margin-bottom: 20px;
 }
 .consent__choices {
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-md);
-  padding: 12px 16px 16px;
-  margin: 0 0 18px;
+  border: 0;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .consent__legend {
-  font-weight: 600;
-  padding: 0 6px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  padding: 0;
 }
-.consent__choice {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background 0.12s ease;
-}
-.consent__choice:hover {
-  background: var(--c-primary-soft);
-}
-.consent__choice input {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--c-primary);
+.consent__hint {
+  margin: 0 0 10px;
+  font-size: 0.875rem;
+  color: var(--c-text-muted);
 }
 
 /* ============================================================
-   アンケート共通 (pre-survey / survey = post)
+   選択肢カード (同意・アンケートの ラジオ / チェックボックス)
    ============================================================ */
-.pre-survey,
-.view--post-survey .survey__form {
+.consent__choice,
+.survey__choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--tap);
+  padding: 10px 16px;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.consent__choice:hover,
+.survey__choice:hover {
+  border-color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
+.consent__choice input,
+.survey__choice input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--c-primary);
+  cursor: pointer;
+}
+/* 選んだ選択肢は枠を太く・太字に (色だけに頼らない) */
+.consent__choice:has(input:checked),
+.survey__choice:has(input:checked) {
+  border-color: var(--c-primary);
+  box-shadow: 0 0 0 1px var(--c-primary) inset;
+  background: var(--c-primary-soft);
+  font-weight: 700;
+}
+/* ラベル全体を押せる部品として見せるため、フォーカス枠はカードに出す */
+.consent__choice:has(input:focus-visible),
+.survey__choice:has(input:focus-visible) {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 2px;
+}
+.consent__choice input:focus-visible,
+.survey__choice input:focus-visible {
+  outline: none;
+}
+
+/* ============================================================
+   アンケート (事前・事後)
+   ============================================================ */
+.survey__form {
   display: flex;
   flex-direction: column;
 }
 
-fieldset.pre-survey__clarity,
+.survey__required-note {
+  margin: -0.75em 0 1.25em;
+  font-size: 0.875rem;
+  color: var(--c-text-muted);
+}
+
 .survey__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   border: 1px solid var(--c-border);
   border-radius: var(--radius-md);
-  padding: 16px 18px;
-  margin: 0 0 18px;
+  padding: 16px 18px 18px;
+  margin: 0 0 16px;
   background: var(--c-surface-muted);
 }
 
-.pre-survey__clarity legend,
-.survey__legend,
-.survey__label {
-  font-weight: 600;
+.survey__legend {
+  float: left; /* legend を枠の内側に入れる */
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 0;
+  font-weight: 700;
+  line-height: 1.6;
   color: var(--c-text);
-  padding: 0 4px;
+}
+.survey__legend + * {
+  clear: both;
+}
+.survey__optional {
+  margin-left: 4px;
+  font-weight: 400;
+  font-size: 0.875rem;
+  color: var(--c-text-muted);
 }
 
-/* 尺度 (1〜5) の選択肢を横並びのピル型に */
-.pre-survey__clarity,
-.survey__field[data-field="clarity"],
-.survey__field[data-field="conviction"] {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-.pre-survey__clarity legend,
-.survey__field[data-field="clarity"] .survey__legend,
-.survey__field[data-field="conviction"] .survey__legend {
-  flex-basis: 100%;
-  margin-bottom: 6px;
+.survey__note {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--c-text-muted);
 }
 
-.pre-survey__clarity-option,
-.survey__scale-option {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  border: 1px solid var(--c-border);
-  border-radius: 999px;
-  background: var(--c-surface);
-  cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease;
-  min-width: 48px;
-  justify-content: center;
-}
-.pre-survey__clarity-option:hover,
-.survey__scale-option:hover {
-  border-color: var(--c-primary);
-  background: var(--c-primary-soft);
-}
-.pre-survey__clarity-option input,
-.survey__scale-option input {
-  accent-color: var(--c-primary);
-}
-
-/* 自由記述 */
-.pre-survey__free-text,
 .survey__textarea {
   width: 100%;
-  border: 1px solid var(--c-border);
+  border: 1px solid var(--c-bubble-stroke);
   border-radius: var(--radius-sm);
   padding: 12px 14px;
   font: inherit;
+  line-height: 1.6;
   resize: vertical;
-  min-height: 92px;
+  min-height: 120px;
   background: var(--c-surface);
+  color: var(--c-text);
 }
 
-/* バリデーション強調 (is-invalid / survey__field--invalid) */
-.is-invalid,
+/* 未回答の項目: 枠と背景に加え、「1つ選んでください」の文を出す */
 .survey__field--invalid {
-  border-color: var(--c-danger) !important;
-  background: var(--c-danger-soft) !important;
+  border: 2px solid var(--c-danger);
+  background: var(--c-danger-soft);
+}
+.survey__field-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--c-danger);
+}
+.survey__field-error::before,
+.survey__error::before,
+.questions-view__notice::before,
+.result-view__error::before {
+  content: "!";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.25em;
+  height: 1.25em;
+  border-radius: 50%;
+  background: var(--c-danger);
+  color: #fff;
+  font-size: 0.85em;
+  font-weight: 800;
+  line-height: 1;
 }
 
-.pre-survey__error {
+.survey__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--c-danger-soft);
   color: var(--c-danger);
-  font-weight: 600;
-  margin: 4px 0 12px;
+  font-weight: 700;
+}
+.survey__error::before {
+  margin-top: 0.3em;
+}
+.survey__error[hidden] {
+  display: none;
 }
 
 /* ============================================================
    質問画面 (questions-view)
    ============================================================ */
 .questions-view__progress {
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 .questions-view__progress-text {
   margin: 0;
-  font-weight: 600;
+  font-size: 0.9rem;
+  font-weight: 700;
   color: var(--c-primary-hover);
 }
-/* 進捗ゲージ */
 .questions-view__progress-bar {
   height: 8px;
   margin-top: 8px;
@@ -403,52 +602,91 @@ fieldset.pre-survey__clarity,
   height: 100%;
   width: 0;
   border-radius: 999px;
-  background: linear-gradient(90deg, #7fd0c4, var(--c-primary));
+  background: var(--c-primary);
   transition: width 0.25s ease;
 }
 
 .questions-view__question {
-  background: var(--c-surface-muted);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-md);
-  padding: 18px 20px;
   margin-bottom: 20px;
+  border-radius: var(--radius-md);
 }
 .questions-view__question--missing {
-  border-color: var(--c-danger);
+  padding: 14px;
+  border: 2px solid var(--c-danger);
   background: var(--c-danger-soft);
 }
 .questions-view__heading {
-  margin: 0 0 14px;
-  font-size: 1.15rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 0 18px;
+  font-size: clamp(1.1rem, 3.8vw, 1.3rem);
+  font-weight: 700;
+  line-height: 1.6;
+}
+.questions-view__number {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.6em;
+  height: 1.9em;
+  margin-top: 0.1em;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--c-primary-soft);
+  color: var(--c-primary-hover);
+  font-size: 0.85rem;
+  font-weight: 800;
 }
 
 .questions-view__choices {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 .questions-view__choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   text-align: left;
   width: 100%;
-  padding: 12px 16px;
-  border: 1px solid var(--c-border);
+  min-height: var(--tap);
+  padding: 10px 16px;
+  border: 1px solid var(--c-border-strong);
   border-radius: var(--radius-sm);
   background: var(--c-surface);
   color: var(--c-text);
   font: inherit;
   cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+/* 選択印の丸 (選ぶとチェックが入る) */
+.questions-view__choice::before {
+  content: "";
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--c-bubble-stroke);
+  border-radius: 50%;
+  background: var(--c-surface);
 }
 .questions-view__choice:hover {
   border-color: var(--c-primary);
   background: var(--c-primary-soft);
 }
-.questions-view__choice--selected {
+.questions-view__choice--selected,
+.questions-view__choice--selected:hover {
   border-color: var(--c-primary);
-  background: var(--c-primary);
-  color: #fff;
-  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--c-primary) inset;
+  background: var(--c-primary-soft);
+  font-weight: 700;
+}
+.questions-view__choice--selected::before {
+  border-color: var(--c-primary);
+  background: var(--c-primary)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 10.5l3.2 3.2L15 7' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 16px no-repeat;
 }
 
 .questions-view__controls {
@@ -457,68 +695,71 @@ fieldset.pre-survey__clarity,
   gap: 10px;
   margin-top: 8px;
 }
-.questions-view__prev,
-.questions-view__next {
-  background: var(--c-surface);
-  color: var(--c-primary);
-  border-color: var(--c-primary);
-  box-shadow: none;
-}
-.questions-view__prev:hover,
-.questions-view__next:hover {
-  background: var(--c-primary-soft);
+/* 答えたら「次へ」を、すべて答えたら「診断する」を主ボタンにする */
+.questions-view__next--ready,
+.questions-view__diagnose--ready {
+  background: var(--c-primary);
+  color: #fff;
 }
 .questions-view__diagnose {
   margin-left: auto;
 }
 .questions-view__notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   color: var(--c-danger);
-  font-weight: 600;
+  font-weight: 700;
   background: var(--c-danger-soft);
   border-radius: var(--radius-sm);
-  padding: 10px 14px;
-  margin-top: 12px;
+  padding: 12px 16px;
+  margin: 16px 0 0;
+}
+.questions-view__notice::before {
+  margin-top: 0.3em;
 }
 
 /* ============================================================
-   診断結果 (result-view / factor / bubble map)
+   診断結果 (result-view / bubble map / factor)
    ============================================================ */
-.result-view__map {
-  display: flex;
-  justify-content: center;
-  padding: 8px 0;
-  margin: 4px 0 24px;
-  overflow-x: auto;
-}
-.result-view__map svg,
-.moyamoya-map {
-  max-width: 100%;
-  height: auto;
+.result-view__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--c-primary-hover);
+  letter-spacing: 0.08em;
+  margin-bottom: 0.8em;
 }
 
-/* バブル (SVG)。枠線なしの塗りつぶし。タイプ以外は淡い青灰色 */
-.bubble circle {
-  fill: #dfe6ef;
+/* 読み込み中 */
+.result-view__loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0;
 }
-.bubble__label,
-.bubble__score {
-  fill: #4f6273;
-  font-family: var(--font-sans);
-  font-weight: 600;
+.spinner {
+  width: 22px;
+  height: 22px;
+  border: 3px solid var(--c-primary-soft);
+  border-top-color: var(--c-primary);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
 }
-.bubble__label {
-  font-size: 12px;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
-.bubble__score {
-  font-size: 13px;
+
+.result-view__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--c-danger);
+  font-weight: 700;
 }
-/* タイプの円 (タイプ名の元になった要因) はオレンジ */
-.bubble--type circle {
-  fill: #f5b27a;
-}
-.bubble--type .bubble__label,
-.bubble--type .bubble__score {
-  fill: #6b3a12;
+.result-view__error::before {
+  margin-top: 0.3em;
 }
 
 /* 見出し: 「Nつの組み合わせ」→ タイプ名 → ひとこと解説 */
@@ -526,39 +767,108 @@ fieldset.pre-survey__clarity,
   margin: 0 0 8px;
 }
 .result-view__headline-lead {
-  margin: 0;
+  display: inline-block;
+  margin: 0 0 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--c-accent-soft);
+  color: var(--c-accent-text);
   font-size: 0.8rem;
-  color: var(--c-text-muted);
+  font-weight: 700;
 }
 .result-view__headline-name {
-  margin: 2px 0 0;
-  font-size: clamp(1.35rem, 4.5vw, 1.6rem);
+  margin: 0;
+  font-size: clamp(1.5rem, 6vw, 1.9rem);
   font-weight: 800;
-  line-height: 1.3;
+  line-height: 1.35;
   color: var(--c-text);
 }
 .result-view__headline-desc {
-  margin: 4px 0 0;
-  font-size: 0.92rem;
+  margin: 6px 0 0;
   color: var(--c-text-muted);
+}
+
+.result-view__low {
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--c-primary-soft);
+  color: var(--c-primary-hover);
+  font-weight: 700;
+}
+
+/* マップ */
+.result-view__map {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 0;
+  margin: 8px 0 4px;
+  overflow-x: auto;
+}
+.result-view__map svg,
+.moyamoya-map {
+  max-width: 100%;
+  height: auto;
+}
+.result-view__map-legend {
+  margin: 0 0 28px;
+  font-size: 0.85rem;
+  color: var(--c-text-muted);
+  text-align: center;
+}
+
+/* バブル (SVG)。輪郭は背景と 3:1 以上にして、円の形が分かるようにする */
+.bubble circle {
+  fill: var(--c-bubble);
+  stroke: var(--c-bubble-stroke);
+  stroke-width: 1.5;
+}
+.bubble__label,
+.bubble__score {
+  fill: var(--c-bubble-text);
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.bubble__label {
+  font-size: 12px;
+}
+.bubble__score {
+  font-size: 14px;
+}
+/* タイプの円 (タイプ名の元になった要因) はオレンジ */
+.bubble--type circle {
+  fill: var(--c-bubble-type);
+  stroke: var(--c-bubble-type-stroke);
+  stroke-width: 2;
+}
+.bubble--type .bubble__label,
+.bubble--type .bubble__score {
+  fill: var(--c-bubble-type-text);
 }
 
 /* マップ上の線 (タイプの要因どうしを結ぶ)。円の下に描き、円と円の間だけ見える */
 .map-link {
-  stroke: #e07b2c;
+  stroke: var(--c-link);
   stroke-width: 4;
   stroke-linecap: round;
   fill: none;
 }
 
-/* 要因詳細リスト */
+/* 要因詳細 */
+.result-view__section-title {
+  margin: 0 0 14px;
+  padding-top: 24px;
+  border-top: 1px solid var(--c-border);
+  font-size: 1.15rem;
+  font-weight: 800;
+}
 .factor-details {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 .factor {
   border: 1px solid var(--c-border);
@@ -566,41 +876,76 @@ fieldset.pre-survey__clarity,
   padding: 16px 20px;
   background: var(--c-surface-muted);
 }
+.factor[data-type="true"] {
+  border-left: 5px solid var(--c-bubble-type-stroke);
+}
 .factor--top {
-  border-color: var(--c-accent);
-  background: #fff7ec;
-  box-shadow: 0 0 0 1px var(--c-accent) inset;
+  background: #fff8ee;
 }
 .factor__label {
   margin: 0 0 6px;
-  font-size: 1.15rem;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.factor__top-badge {
-  font-size: 0.72rem;
+  font-size: 1.05rem;
   font-weight: 700;
-  color: #fff;
-  background: var(--c-accent);
+}
+.factor__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+.factor__top-badge,
+.factor__type-tag {
+  font-size: 0.75rem;
+  font-weight: 700;
   border-radius: 999px;
   padding: 2px 10px;
   letter-spacing: 0.04em;
 }
+.factor__top-badge {
+  color: #fff;
+  background: var(--c-accent-strong);
+}
+.factor__type-tag {
+  color: var(--c-accent-text);
+  background: var(--c-accent-soft);
+}
 .factor__score {
-  margin: 0 0 8px;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 10px;
+}
+.factor__score-text {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
   color: var(--c-primary-hover);
 }
+.factor__meter {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--c-border);
+  overflow: hidden;
+}
+.factor__meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--c-primary);
+}
+.factor[data-type="true"] .factor__meter-fill {
+  background: var(--c-bubble-type-stroke);
+}
 .factor__description {
-  margin: 0 0 10px;
-  color: var(--c-text-muted);
+  margin: 0 0 12px;
+  color: var(--c-text);
 }
 .factor__related-title {
-  margin: 0 0 4px;
+  margin: 0 0 6px;
   font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--c-text);
+  font-weight: 700;
+  color: var(--c-text-muted);
 }
 .factor__related-list {
   list-style: none;
@@ -608,14 +953,31 @@ fieldset.pre-survey__clarity,
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 .factor__related-item {
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   background: var(--c-primary-soft);
   color: var(--c-primary-hover);
   border-radius: 999px;
-  padding: 4px 12px;
+  padding: 3px 12px;
+}
+
+/* 事後アンケートへの導線 */
+.result-view__actions {
+  margin-top: 28px;
+  padding: 20px;
+  border-radius: var(--radius-md);
+  background: var(--c-primary-soft);
+  text-align: center;
+}
+.result-view__actions-note {
+  margin: 0 0 12px;
+  font-weight: 700;
+  color: var(--c-primary-hover);
+}
+.result-view__next {
+  min-width: min(100%, 260px);
 }
 
 /* ============================================================
@@ -625,110 +987,34 @@ fieldset.pre-survey__clarity,
   text-align: center;
 }
 .view--complete .view__title::before {
-  content: "✓";
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  content: "";
+  display: block;
   width: 64px;
   height: 64px;
   margin: 0 auto 16px;
   border-radius: 50%;
-  background: var(--c-primary);
-  color: #fff;
-  font-size: 2rem;
-  box-shadow: var(--shadow-md);
+  background: var(--c-primary)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 12.5l4 4L18 8' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 36px no-repeat;
+}
+.complete__id {
+  margin-top: 20px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--c-surface-muted);
+  font-size: 0.85rem;
+  color: var(--c-text-muted);
+  text-align: left;
+  word-break: break-all;
 }
 
 .view--error {
-  border-color: var(--c-danger);
+  border: 2px solid var(--c-danger);
 }
 .view--error p {
   color: var(--c-danger);
-  font-weight: 600;
+  font-weight: 700;
   margin: 0;
-}
-
-/* ============================================================
-   レスポンシブ微調整
-   ============================================================ */
-@media (max-width: 480px) {
-  .questions-view__controls {
-    flex-direction: column;
-  }
-  .questions-view__diagnose {
-    margin-left: 0;
-  }
-  .questions-view__prev,
-  .questions-view__next,
-  .questions-view__diagnose,
-  .button {
-    width: 100%;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .view,
-  .questions-view,
-  .result-view,
-  .pre-survey {
-    animation: none;
-  }
-}
-
-/* ============================================================
-   アンケート (事前事後アンケート案 2026-11-11 版の設問)
-   ============================================================ */
-.view--pre-survey .survey__form {
-  display: flex;
-  flex-direction: column;
-}
-
-.survey__field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.survey__field .survey__legend {
-  margin-bottom: 4px;
-  line-height: 1.6;
-}
-
-.survey__choice {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-sm);
-  background: var(--c-surface);
-  cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease;
-}
-.survey__choice:hover {
-  border-color: var(--c-primary);
-  background: var(--c-primary-soft);
-}
-.survey__choice input {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  accent-color: var(--c-primary);
-}
-.survey__choice:has(input:checked) {
-  border-color: var(--c-primary);
-  background: var(--c-primary-soft);
-}
-
-.survey__note {
-  margin: 0;
-  font-size: 0.9em;
-  color: var(--c-text-muted);
-}
-
-.survey__error {
-  color: var(--c-danger);
-  font-weight: 600;
-  margin: 4px 0 12px;
 }
 
 /* テストモードの帯 (本番データにならないことを示す) */
@@ -741,18 +1027,67 @@ fieldset.pre-survey__clarity,
   color: #3a2600;
   font-weight: 700;
   text-align: center;
-  font-size: 0.9em;
+  font-size: 0.875rem;
 }
 
-.result-view__low {
-  padding: 12px 16px;
-  border-radius: var(--radius-sm);
-  background: var(--c-primary-soft);
+/* ============================================================
+   スマートフォン
+   ============================================================ */
+@media (max-width: 480px) {
+  .questions-view__controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .questions-view__diagnose {
+    grid-column: 1 / -1;
+    margin-left: 0;
+  }
+  .button,
+  .result-view__next {
+    width: 100%;
+  }
+  .factor {
+    padding: 14px 16px;
+  }
 }
 
-.complete__id {
-  margin-top: 16px;
-  font-size: 0.85em;
-  color: var(--c-text-muted);
-  word-break: break-all;
+/* ============================================================
+   設定への配慮
+   ============================================================ */
+
+/* 動きを減らす設定: アニメーション・移り変わりを止める */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ハイコントラスト (forced-colors): 背景色が消えても状態が分かるようにする */
+@media (forced-colors: active) {
+  .questions-view__choice--selected,
+  .consent__choice:has(input:checked),
+  .survey__choice:has(input:checked) {
+    outline: 3px solid Highlight;
+    outline-offset: -3px;
+  }
+  .questions-view__choice--selected::before {
+    background: Highlight;
+  }
+  .flow-step__seg.is-done,
+  .flow-step__seg.is-current,
+  .questions-view__progress-fill,
+  .factor__meter-fill {
+    background: Highlight;
+  }
+  .bubble circle {
+    stroke: CanvasText;
+  }
+  .map-link {
+    stroke: CanvasText;
+  }
 }

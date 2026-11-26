@@ -19,6 +19,7 @@ import {
 import {
   createCheckboxGroup,
   createRadioGroup,
+  focusFirstInvalid,
   highlightFields,
 } from "@/views/surveyFields";
 
@@ -55,6 +56,11 @@ export function createPreSurveyView(container: HTMLElement, deps: PreSurveyViewD
       "この診断でいう「もやもや」とは、便利になった生活の中でも、どこかすっきりしない・満たされない・" +
       "引っかかりが残る感覚のことです。正解はありません。いまの気持ちに近いものを選んでください。";
     section.appendChild(lead);
+
+    const requiredNote = document.createElement("p");
+    requiredNote.className = "survey__required-note";
+    requiredNote.textContent = "「（任意）」と書いた項目のほかは、すべてお答えください。";
+    section.appendChild(requiredNote);
 
     const form = document.createElement("form");
     form.className = "survey__form";
@@ -126,7 +132,8 @@ export function createPreSurveyView(container: HTMLElement, deps: PreSurveyViewD
       const invalid = validatePreSurvey(input);
       highlightFields(form, invalid);
       if (invalid.length > 0) {
-        showError("未回答の項目があります。色の付いた項目を確認してください。");
+        showError(`未回答の項目が ${invalid.length} 件あります。「選んでください」と表示された項目に答えてください。`);
+        focusFirstInvalid(form);
         return;
       }
       showError("");
