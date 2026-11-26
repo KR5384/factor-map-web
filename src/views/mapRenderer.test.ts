@@ -4,6 +4,11 @@ import {
   computeLayout,
   computeLinkSegments,
   shortLabel,
+  splitLabel,
+  fitLabel,
+  textWidthEm,
+  BUBBLE_RADIUS_MIN,
+  BUBBLE_RADIUS_MAX,
   type MapLine,
 } from "@/views/mapRenderer";
 import type { Factor } from "@/models/types";
@@ -23,6 +28,30 @@ describe("shortLabel", () => {
   it("「/」より前を使い、無ければそのまま", () => {
     expect(shortLabel("反すう/考え続ける状態")).toBe("反すう");
     expect(shortLabel("時間・余白不足")).toBe("時間・余白不足");
+  });
+});
+
+describe("fitLabel (円からはみ出さない)", () => {
+  const labels = [
+    "時間・余白不足", "回復不足", "情報過多", "他者比較", "孤独",
+    "将来の不確実性", "コントロール感の低下", "理想と現実のギャップ", "反すう", "決められない",
+  ];
+
+  it("長いラベルは区切りのよい所で2行に分ける", () => {
+    expect(splitLabel("理想と現実のギャップ", 0)).toEqual(["理想と現実の", "ギャップ"]);
+    expect(splitLabel("コントロール感の低下", 0)).toEqual(["コントロール", "感の低下"]);
+    expect(splitLabel("反すう", 10)).toEqual(["反すう"]);
+  });
+
+  it("どのラベルも、最小〜最大のどの円でも横幅に収まる", () => {
+    for (const label of labels) {
+      for (let r = BUBBLE_RADIUS_MIN; r <= BUBBLE_RADIUS_MAX; r += 1) {
+        const { lines, fontSize } = fitLabel(label, r);
+        // 2行目の下端 (中心から約 +4px) と1行目の上端 (約 -24px) のうち狭い方の幅
+        const chord = 2 * Math.sqrt(r * r - 24 * 24);
+        for (const line of lines) expect(textWidthEm(line) * fontSize).toBeLessThanOrEqual(chord);
+      }
+    }
   });
 });
 

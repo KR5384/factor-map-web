@@ -13,7 +13,7 @@ export const API_BASE_URL: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) || DEFAULT_API_BASE_URL;
 
 /** 利用同意文の版。同意画面の文言を変えたら上げる (DB の consent_version に保存される) */
-export const CONSENT_VERSION = "2026-11-v1";
+export const CONSENT_VERSION = "2026-11-v2"; // v2: 要約3点＋詳しい説明 (2026-11-26)
 
 /** フロントの版。結果画面の見せ方などを変えたら上げる (DB の client_version に保存される) */
 export const CLIENT_VERSION = "web-0.3.0"; // 0.3.0: 円 (最大5つ)＋タイプの線＋タイプ名の結果画面 (2026-11-20)

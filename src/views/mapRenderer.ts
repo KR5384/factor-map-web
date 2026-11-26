@@ -74,6 +74,79 @@ export function shortLabel(label: string): string {
   return head ? head : label;
 }
 
+/** 円のラベルの文字の大きさ (px)。入りきらないときは MIN まで小さくする。 */
+const LABEL_FONT_SIZE = 12;
+const LABEL_FONT_SIZE_MIN = 9;
+/** 2行のときの行の間隔 (px)。 */
+const LABEL_LINE_HEIGHT = 14;
+/** 文字と円の縁のあいだに取る余白 (px、左右それぞれ)。 */
+const LABEL_SIDE_PADDING = 8;
+
+/** 文字列の幅を、全角 1em・半角 0.6em として見積もる (em 単位)。 */
+export function textWidthEm(text: string): number {
+  let w = 0;
+  for (const ch of text) w += /[ -~｡-ﾟ]/.test(ch) ? 0.6 : 1;
+  return w;
+}
+
+/** 文字の種類 (かな・カタカナ・漢字など)。種類が変わる所は改行しやすい区切り。 */
+function charKind(ch: string): string {
+  if (/[ぁ-ゟ]/.test(ch)) return "hiragana";
+  if (/[゠-ヿ]/.test(ch)) return "katakana";
+  if (/[一-鿿]/.test(ch)) return "kanji";
+  return "other";
+}
+
+/**
+ * splitLabel: ラベルを1〜2行に分ける純粋関数。
+ * maxWidthEm に収まればそのまま1行。収まらなければ、区切りのよい所
+ * (「の」「と」「・」のあと、カタカナと漢字の境目など) のうち、長い方の行が最も短くなる所で2行に分ける。
+ * 区切りが無ければ真ん中で分ける。
+ */
+export function splitLabel(label: string, maxWidthEm: number): string[] {
+  const chars = [...label];
+  if (textWidthEm(label) <= maxWidthEm || chars.length < 2) return [label];
+  const candidates: number[] = [];
+  for (let i = 1; i < chars.length; i++) {
+    const prev = chars[i - 1]!;
+    const next = chars[i]!;
+    if ("のと・".includes(prev) || charKind(prev) !== charKind(next)) {
+      // 「・」・小さい字・長音・助詞で行を始めない
+      if (!"・ーャュョッァィゥェォのとをにがはへでや".includes(next)) candidates.push(i);
+    }
+  }
+  if (candidates.length === 0) candidates.push(Math.ceil(chars.length / 2));
+  let best = candidates[0]!;
+  let bestWidth = Infinity;
+  for (const i of candidates) {
+    const w = Math.max(textWidthEm(chars.slice(0, i).join("")), textWidthEm(chars.slice(i).join("")));
+    if (w < bestWidth) {
+      bestWidth = w;
+      best = i;
+    }
+  }
+  return [chars.slice(0, best).join(""), chars.slice(best).join("")];
+}
+
+/**
+ * fitLabel: 半径 radius の円に収まるよう、ラベルの行と文字の大きさを決める。
+ * 1行で入れば 12px のまま1行、入らなければ2行に分け、それでも入らなければ文字を小さくする。
+ */
+export function fitLabel(label: string, radius: number): { lines: string[]; fontSize: number } {
+  // ラベルはおおむね円の中心より上 (中心から 0〜24px) に置くので、その高さでの円の幅を使う。
+  const usable = (dy: number): number =>
+    2 * Math.sqrt(Math.max(0, radius * radius - dy * dy)) - LABEL_SIDE_PADDING * 2;
+  const oneLine = [label];
+  if (textWidthEm(label) * LABEL_FONT_SIZE <= usable(15)) {
+    return { lines: oneLine, fontSize: LABEL_FONT_SIZE };
+  }
+  const width = usable(24);
+  const lines = splitLabel(label, 0);
+  const widest = Math.max(...lines.map(textWidthEm));
+  const fontSize = Math.max(LABEL_FONT_SIZE_MIN, Math.min(LABEL_FONT_SIZE, Math.floor(width / widest)));
+  return { lines, fontSize };
+}
+
 // ============================================================
 // 純粋関数: レイアウト算出
 // ============================================================
@@ -429,18 +502,29 @@ function createBubbleGroup(
 
   // 短いラベルと点数を2行でバブル中央に表示する (Req 10.3)。
   const label = document.createElementNS(SVG_NS, "text");
+  // 円に入りきらない長いラベルは2行に分け、それでも入らなければ文字を小さくする。
+  const fitted = fitLabel(shortLabel(bubble.factor.label), bubble.radius);
+  const twoLines = fitted.lines.length > 1;
+  const firstY = twoLines ? bubble.cy - 17 : bubble.cy - 9;
   label.setAttribute("x", String(bubble.cx));
-  label.setAttribute("y", String(bubble.cy - 9));
+  label.setAttribute("y", String(firstY));
   label.setAttribute("text-anchor", "middle");
   label.setAttribute("dominant-baseline", "central");
   label.setAttribute("class", "bubble__label");
   label.setAttribute("aria-hidden", "true");
-  label.textContent = shortLabel(bubble.factor.label);
+  if (fitted.fontSize !== LABEL_FONT_SIZE) label.style.fontSize = `${fitted.fontSize}px`;
+  fitted.lines.forEach((line, i) => {
+    const tspan = document.createElementNS(SVG_NS, "tspan");
+    tspan.setAttribute("x", String(bubble.cx));
+    tspan.setAttribute("y", String(firstY + i * LABEL_LINE_HEIGHT));
+    tspan.textContent = line;
+    label.appendChild(tspan);
+  });
   group.appendChild(label);
 
   const score = document.createElementNS(SVG_NS, "text");
   score.setAttribute("x", String(bubble.cx));
-  score.setAttribute("y", String(bubble.cy + 11));
+  score.setAttribute("y", String(twoLines ? bubble.cy + 16 : bubble.cy + 11));
   score.setAttribute("text-anchor", "middle");
   score.setAttribute("dominant-baseline", "central");
   score.setAttribute("class", "bubble__score");

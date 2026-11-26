@@ -46,7 +46,7 @@ import { focusViewHeading } from "@/views/a11y";
 // 画面ごとのページタイトルとステップ表示
 // ============================================================
 
-const APP_NAME = "もやもや診断";
+const APP_NAME = "もやもや～ん";
 
 /** 画面ごとのページタイトル (タブ名・読み上げで今いる画面が分かるように)。 */
 const PAGE_TITLES: Record<ViewName, string> = {

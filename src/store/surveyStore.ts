@@ -18,13 +18,34 @@ export interface Option<T> {
   label: string;
 }
 
-/** 5段階 (1〜5)。診断20問と同じ表現 */
-export const SCALE_OPTIONS: Option<number>[] = [
-  { value: 1, label: "まったく当てはまらない" },
-  { value: 2, label: "あまり当てはまらない" },
+// 5段階 (値 1〜5。5 が肯定)。答えやすいよう肯定 (5) を上に並べる。値の意味は変えない。
+// 質問文に合わせて言葉を変える (P1・A1 は「できる」、P2・A2 は「わかる」、A3・A4 は「そう思う」)。
+
+/** P1・A1 説明できる */
+export const EXPLAIN_OPTIONS: Option<number>[] = [
+  { value: 5, label: "十分できる" },
+  { value: 4, label: "ややできる" },
   { value: 3, label: "どちらともいえない" },
-  { value: 4, label: "やや当てはまる" },
-  { value: 5, label: "非常によく当てはまる" },
+  { value: 2, label: "あまりできない" },
+  { value: 1, label: "まったくできない" },
+];
+
+/** P2・A2 つながりが分かる */
+export const UNDERSTAND_OPTIONS: Option<number>[] = [
+  { value: 5, label: "よくわかる" },
+  { value: 4, label: "ややわかる" },
+  { value: 3, label: "どちらともいえない" },
+  { value: 2, label: "あまりわからない" },
+  { value: 1, label: "まったくわからない" },
+];
+
+/** A3 当てはまる・A4 気づいた (事後のみ) */
+export const AGREE_OPTIONS: Option<number>[] = [
+  { value: 5, label: "とてもそう思う" },
+  { value: 4, label: "ややそう思う" },
+  { value: 3, label: "どちらともいえない" },
+  { value: 2, label: "あまりそう思わない" },
+  { value: 1, label: "まったくそう思わない" },
 ];
 
 /** P0 頻度 (1〜4) */

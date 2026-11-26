@@ -149,6 +149,11 @@ function buildFactorDetails(
   const list = document.createElement("ol");
   list.className = "factor-details";
 
+  // オレンジ (タイプの要因) の説明は開いたまま、それ以外は畳んで「開く」で見せる。
+  // タイプが無い結果 (全部0点など) では最大要因を開いておく。
+  const isOpenByDefault = (f: Factor): boolean =>
+    typeFactorIds.size > 0 ? typeFactorIds.has(f.id) : f.id === topFactorId;
+
   for (const factor of factors) {
     const isTop = factor.id === topFactorId;
 
@@ -203,11 +208,14 @@ function buildFactorDetails(
     score.append(scoreText, meter);
     item.appendChild(score);
 
-    // 説明文は常に表示する (Req 11.1 / 11.4)。
+    // 説明文と関連要因はまとめて body に入れ、畳めるようにする (Req 11.1 / 11.4)。
+    const body = document.createElement("div");
+    body.className = "factor__body";
+    body.id = `factor-body-${factor.id}`;
     const description = document.createElement("p");
     description.className = "factor__description";
     description.textContent = factor.description;
-    item.appendChild(description);
+    body.appendChild(description);
 
     // 関連要因: 空のときはセクションごと表示しない (Req 11.4)。
     if (factor.relatedFactorIds.length > 0) {
@@ -229,13 +237,40 @@ function buildFactorDetails(
         relatedList.appendChild(relatedItem);
       }
       relatedSection.appendChild(relatedList);
-      item.appendChild(relatedSection);
+      body.appendChild(relatedSection);
+    }
+    item.appendChild(body);
+
+    if (!isOpenByDefault(factor)) {
+      body.hidden = true;
+      item.appendChild(createExpandButton(body, factor.label));
     }
 
     list.appendChild(item);
   }
 
   return list;
+}
+
+/** 畳んだ説明を開閉するボタン (「開く ∨」/「閉じる ∧」)。 */
+function createExpandButton(body: HTMLElement, label: string): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "factor__toggle";
+  button.setAttribute("aria-controls", body.id);
+  const update = (): void => {
+    const open = !body.hidden;
+    button.setAttribute("aria-expanded", String(open));
+    button.textContent = open ? "閉じる" : "開く";
+    // 読み上げでは、どの要因の説明かも分かるようにする
+    button.setAttribute("aria-label", `${label}の説明を${open ? "閉じる" : "開く"}`);
+  };
+  button.addEventListener("click", () => {
+    body.hidden = !body.hidden;
+    update();
+  });
+  update();
+  return button;
 }
 
 // ============================================================

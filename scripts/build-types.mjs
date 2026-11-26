@@ -194,7 +194,8 @@ function main(argv) {
     } catch {
       // 無ければ不一致
     }
-    if (current !== json) {
+    // Windows (git の autocrlf) で types.json の改行が CRLF になっても一致とみなす。
+    if (current.replace(/\r\n/g, "\n") !== json) {
       console.error("public/types.json が CSV と一致しません。npm run build:types で作り直してください。");
       process.exit(1);
     }

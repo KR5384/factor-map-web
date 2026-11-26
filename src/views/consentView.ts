@@ -81,12 +81,8 @@ export function renderConsentView(
   title.textContent = "利用同意";
   section.appendChild(title);
 
-  // Req 3.1: 利用同意の説明文を表示する。
-  const explanation = document.createElement("p");
-  explanation.className = "consent__explanation";
-  explanation.textContent =
-    "本診断で入力いただいた回答は、匿名の研究データとして診断前後の気持ちの変化の分析に利用します。個人を特定する情報は収集しません。内容をご確認のうえ、同意するかどうかをお選びください。";
-  section.appendChild(explanation);
+  // Req 3.1: 利用同意の説明。要約 (3点) を常に見せ、詳しい説明は開いて読む。
+  section.appendChild(buildConsentExplanation());
 
   // Req 3.1: 「同意」「非同意」の2つの選択肢を、いずれも未選択の初期状態で表示する。
   const fieldset = document.createElement("fieldset");
@@ -94,7 +90,7 @@ export function renderConsentView(
 
   const legend = document.createElement("legend");
   legend.className = "consent__legend";
-  legend.textContent = "研究データの利用に同意しますか？";
+  legend.textContent = "上の内容を読み、研究データの利用に同意しますか？";
   fieldset.appendChild(legend);
 
   const agreeRadio = createChoiceRadio("agree", "同意する");
@@ -197,4 +193,122 @@ function createChoiceRadio(
   wrapper.appendChild(span);
 
   return { wrapper, input };
+}
+
+// ============================================================
+// 利用同意の文 (2026-11-26 改訂。版は config.ts の CONSENT_VERSION)
+// ============================================================
+
+/** 要約 (最初から表示する3点)。 */
+export const CONSENT_SUMMARY: readonly string[] = [
+  "① 入力した回答と診断結果は、匿名の研究データとして使います。",
+  "② 参加は自由です。途中でやめることも、あとから回答の削除を頼むこともできます。",
+  "③ この診断は、医療的な診断ではありません。",
+];
+
+/** 詳しい説明 (開いたときに表示)。items があれば箇条書き、texts は段落。 */
+export const CONSENT_DETAILS: readonly { heading: string; texts?: string[]; items?: string[]; after?: string[] }[] = [
+  {
+    heading: "この研究について",
+    texts: [
+      "この診断は、BIPROGY研究会 関東10G が、「心のもやもやの要因を見える形で示すと、自分が何にもやもやしているのかを理解しやすくなるか」を調べるために行う研究です。",
+    ],
+  },
+  {
+    heading: "集める情報",
+    items: [
+      "事前・事後アンケートの回答（年代は答えなくてもかまいません）",
+      "診断の20問への回答と、診断結果",
+      "感想（任意）",
+      "回答した日時",
+    ],
+  },
+  {
+    heading: "集めない情報",
+    items: [
+      "名前・メールアドレス・所属など、あなたが誰かが分かる情報",
+      "IPアドレスや端末の情報（研究データとしては記録しません）",
+    ],
+    after: ["感想欄には、名前や勤務先など、あなたやほかの人が誰か分かる内容は書かないでください。"],
+  },
+  {
+    heading: "データの扱い",
+    items: [
+      "回答は、個人が特定できない形でクラウドサービス（Cloudflare）上に保存します。",
+      "回答は統計的に処理し、研究会の報告書や成果発表で公表することがあります。個人が特定される形では公表しません。",
+      "データは研究会の活動が終わるまで保存し、その後削除します。研究チーム以外にデータを渡すことはありません。",
+    ],
+  },
+  {
+    heading: "参加は自由です",
+    texts: [
+      "同意するかどうかは自由です。同意しない場合はこの診断を利用できず、トップ画面に戻ります。同意しなくても、途中でやめても、不利益はありません。",
+      "途中でやめた場合、それまでの回答は分析に使いません。",
+    ],
+  },
+  {
+    heading: "回答の削除",
+    texts: [
+      "診断を最後まで終えると「診断ID」が表示されます。削除を希望するときは、この診断IDを研究メンバーにお伝えください。回答は匿名のため、診断IDがないとどの回答か特定できず、削除できません。分析や公表がすでに終わった後は、結果から取り除けないことがあります。",
+    ],
+  },
+  {
+    heading: "気持ちへの配慮",
+    texts: [
+      "この診断は医療的な診断ではなく、病気や心の状態を判断するものではありません。結果は、気持ちを整理するきっかけとしてお使いください。答えていてつらくなったときは、無理せず途中でやめてください。",
+    ],
+  },
+];
+
+function buildConsentExplanation(): HTMLElement {
+  const box = document.createElement("div");
+  box.className = "consent__explanation";
+
+  const summary = document.createElement("ul");
+  summary.className = "consent__summary";
+  for (const line of CONSENT_SUMMARY) {
+    const li = document.createElement("li");
+    li.textContent = line;
+    summary.appendChild(li);
+  }
+  box.appendChild(summary);
+
+  // 詳しい説明は <details> で開閉する (キーボード・読み上げにもそのまま対応)。
+  const details = document.createElement("details");
+  details.className = "consent__details";
+  const toggle = document.createElement("summary");
+  toggle.className = "consent__details-toggle";
+  toggle.textContent = "詳しい説明を読む";
+  details.appendChild(toggle);
+
+  const body = document.createElement("div");
+  body.className = "consent__details-body";
+  for (const block of CONSENT_DETAILS) {
+    const h = document.createElement("h2");
+    h.className = "consent__details-heading";
+    h.textContent = block.heading;
+    body.appendChild(h);
+    for (const t of block.texts ?? []) {
+      const p = document.createElement("p");
+      p.textContent = t;
+      body.appendChild(p);
+    }
+    if (block.items) {
+      const ul = document.createElement("ul");
+      for (const t of block.items) {
+        const li = document.createElement("li");
+        li.textContent = t;
+        ul.appendChild(li);
+      }
+      body.appendChild(ul);
+    }
+    for (const t of block.after ?? []) {
+      const p = document.createElement("p");
+      p.textContent = t;
+      body.appendChild(p);
+    }
+  }
+  details.appendChild(body);
+  box.appendChild(details);
+  return box;
 }

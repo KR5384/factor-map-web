@@ -397,6 +397,70 @@ button:disabled:hover {
   padding: 14px 18px;
   margin-bottom: 20px;
 }
+.consent__summary {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 700;
+}
+.consent__details {
+  margin-top: 12px;
+  border-top: 1px solid var(--c-border);
+}
+/* 右寄せの「詳しい説明を読む ∨」 */
+.consent__details-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-height: 44px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--c-primary-hover);
+  cursor: pointer;
+  list-style: none;
+}
+.consent__details-toggle::-webkit-details-marker {
+  display: none;
+}
+.consent__details-toggle::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.consent__details[open] > .consent__details-toggle::after {
+  transform: translateY(2px) rotate(-135deg);
+}
+.consent__details-toggle:hover {
+  text-decoration: underline;
+}
+.consent__details-toggle:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.consent__details-body {
+  font-size: 0.925rem;
+}
+.consent__details-heading {
+  margin: 16px 0 4px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.consent__details-body p,
+.consent__details-body ul {
+  margin: 0 0 6px;
+}
+.consent__details-body ul {
+  padding-left: 1.25em;
+}
 .consent__choices {
   border: 0;
   margin: 0 0 16px;
@@ -479,10 +543,11 @@ button:disabled:hover {
   color: var(--c-text-muted);
 }
 
+/* fieldset は flex にしない。flex だと legend の float が効かず、
+   legend が枠の線の上に出て、2行に折り返すと枠からはみ出す。間隔は margin で取る。 */
 .survey__field {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: block;
+  min-width: 0;
   border: 1px solid var(--c-border);
   border-radius: var(--radius-md);
   padding: 16px 18px 18px;
@@ -493,7 +558,7 @@ button:disabled:hover {
 .survey__legend {
   float: left; /* legend を枠の内側に入れる */
   width: 100%;
-  margin-bottom: 4px;
+  margin-bottom: 12px;
   padding: 0;
   font-weight: 700;
   line-height: 1.6;
@@ -501,6 +566,9 @@ button:disabled:hover {
 }
 .survey__legend + * {
   clear: both;
+}
+.survey__field > :not(.survey__legend) + * {
+  margin-top: 8px;
 }
 .survey__optional {
   margin-left: 4px;
@@ -701,8 +769,16 @@ button:disabled:hover {
   background: var(--c-primary);
   color: #fff;
 }
+/* 前へ は左、次へ・診断する は右に置く */
+.questions-view__next,
 .questions-view__diagnose {
   margin-left: auto;
+}
+.questions-view__hint {
+  margin: 8px 0 0;
+  font-size: 0.875rem;
+  color: var(--c-text-muted);
+  text-align: right;
 }
 .questions-view__notice {
   display: flex;
@@ -961,6 +1037,48 @@ button:disabled:hover {
   color: var(--c-primary-hover);
   border-radius: 999px;
   padding: 3px 12px;
+}
+
+/* 畳んだ説明の開閉ボタン (右寄せの「開く ∨」) */
+.factor__toggle {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 -6px auto;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--c-primary-hover);
+  cursor: pointer;
+}
+.factor__toggle::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.factor__toggle[aria-expanded="true"]::after {
+  transform: translateY(2px) rotate(-135deg);
+}
+.factor__toggle:hover {
+  text-decoration: underline;
+}
+.factor__toggle:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+/* 畳んだカードはスコアの下の余白を詰める */
+.factor:has(.factor__body[hidden]) .factor__score {
+  margin-bottom: 0;
 }
 
 /* 事後アンケートへの導線 */

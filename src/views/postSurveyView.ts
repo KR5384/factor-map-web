@@ -9,7 +9,9 @@
 import type { ApiClient } from "@/api/apiClient";
 import {
   COMMENT_MAX_LENGTH,
-  SCALE_OPTIONS,
+  AGREE_OPTIONS,
+  EXPLAIN_OPTIONS,
+  UNDERSTAND_OPTIONS,
   validatePostSurvey,
   type Group,
   type PostSurveyInput,
@@ -68,14 +70,14 @@ export function renderPostSurveyView(container: HTMLElement, options: PostSurvey
       field: "explain",
       legend: "いま、自分が何にもやもやしているのかを、言葉で説明できる",
       name: "post-explain",
-      options: SCALE_OPTIONS,
+      options: EXPLAIN_OPTIONS,
       onSelect: (v) => (input.explain = v),
     }),
     createRadioGroup({
       field: "relation",
       legend: "いま、自分のもやもやの原因同士が、どうつながっているか分かる",
       name: "post-relation",
-      options: SCALE_OPTIONS,
+      options: UNDERSTAND_OPTIONS,
       onSelect: (v) => (input.relation = v),
     })
   );
@@ -85,14 +87,14 @@ export function renderPostSurveyView(container: HTMLElement, options: PostSurvey
         field: "fit",
         legend: "診断結果は、いまの自分の状態に当てはまっていると思う",
         name: "post-fit",
-        options: SCALE_OPTIONS,
+        options: AGREE_OPTIONS,
         onSelect: (v) => (input.fit = v),
       }),
       createRadioGroup({
         field: "discovery",
         legend: "診断結果を見て、自分では気づいていなかったもやもやの原因に気づいた",
         name: "post-discovery",
-        options: SCALE_OPTIONS,
+        options: AGREE_OPTIONS,
         onSelect: (v) => (input.discovery = v),
       })
     );

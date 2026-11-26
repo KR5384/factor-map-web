@@ -45,7 +45,7 @@ export function renderTopView(
   const title = document.createElement("h1");
   title.id = "top-title";
   title.className = "view__title";
-  title.textContent = "もやもや診断";
+  title.textContent = "もやもや～ん";
   section.appendChild(title);
 
   const lead = document.createElement("p");

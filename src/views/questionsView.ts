@@ -214,12 +214,13 @@ export function createQuestionsView(
 
     const selected = store.getAnswer(question.id);
 
-    question.choices.forEach((label, i) => {
+    // 表示は「当てはまる」側を上にする (答えやすさのため)。
+    // 並べる順番だけを逆にし、各ボタンが持つ値 (ChoiceValue) は変えない。
+    const buttons = question.choices.map((label, i) => {
       const value = CHOICE_VALUES[i] as ChoiceValue;
-      choiceList.appendChild(
-        createChoiceButton(question.id, value, label, selected === value),
-      );
+      return createChoiceButton(question.id, value, label, selected === value);
     });
+    buttons.reverse().forEach((button) => choiceList.appendChild(button));
 
     block.appendChild(choiceList);
     return block;
@@ -270,38 +271,57 @@ export function createQuestionsView(
     });
     controls.appendChild(prevButton);
 
-    // 次へ (Req 7.1 / 7.3): 末尾 (20) では無効化する。
-    // 表示中の質問に答えたら、次に押すボタンとして目立たせる。
+    // 表示中の質問に答えるまでは「次へ」「診断する」を押せない (1問ずつ答えてもらう)。
     const question = currentQuestion();
     const answered = question !== undefined && store.getAnswer(question.id) !== undefined;
-    const nextButton = document.createElement("button");
-    nextButton.type = "button";
-    nextButton.className = answered
-      ? "questions-view__next questions-view__next--ready"
-      : "questions-view__next";
-    nextButton.textContent = "次へ";
-    nextButton.disabled = index >= store.progress().total;
-    nextButton.addEventListener("click", () => {
-      store.gotoNext();
-      render({ kind: "heading" });
-    });
-    controls.appendChild(nextButton);
+    const isLast = index >= store.progress().total;
+    const hintId = "questions-view-hint";
 
-    // 診断する (Req 8.3 / 8.4): 必須チェックを実行して遷移制御する。
-    // すべて答えるまでは控えめに、答え終わったら主ボタンとして目立たせる。
-    const allAnswered = store.progress().remaining === 0;
-    const diagnoseButton = document.createElement("button");
-    diagnoseButton.type = "button";
-    diagnoseButton.className = allAnswered
-      ? "questions-view__diagnose questions-view__diagnose--ready"
-      : "questions-view__diagnose";
-    diagnoseButton.textContent = "診断する";
-    diagnoseButton.addEventListener("click", () => {
-      handleDiagnose();
-    });
-    controls.appendChild(diagnoseButton);
+    if (!isLast) {
+      // 次へ (Req 7.1): 答えたら主ボタンとして目立たせる。
+      const nextButton = document.createElement("button");
+      nextButton.type = "button";
+      nextButton.className = answered
+        ? "questions-view__next questions-view__next--ready"
+        : "questions-view__next";
+      nextButton.textContent = "次へ";
+      nextButton.disabled = !answered;
+      if (!answered) nextButton.setAttribute("aria-describedby", hintId);
+      nextButton.addEventListener("click", () => {
+        store.gotoNext();
+        render({ kind: "heading" });
+      });
+      controls.appendChild(nextButton);
+    } else {
+      // 診断する (Req 8.3 / 8.4): 最後の質問でだけ出す。必須チェックは念のため残す。
+      const diagnoseButton = document.createElement("button");
+      diagnoseButton.type = "button";
+      diagnoseButton.className = answered
+        ? "questions-view__diagnose questions-view__diagnose--ready"
+        : "questions-view__diagnose";
+      diagnoseButton.textContent = "診断する";
+      diagnoseButton.disabled = !answered;
+      if (!answered) diagnoseButton.setAttribute("aria-describedby", hintId);
+      diagnoseButton.addEventListener("click", () => {
+        handleDiagnose();
+      });
+      controls.appendChild(diagnoseButton);
+    }
 
-    return controls;
+    // 押せない理由を添える (無効なボタンだけでは分からないため)。
+    const wrapper = document.createElement("div");
+    wrapper.appendChild(controls);
+    if (!answered) {
+      const hint = document.createElement("p");
+      hint.id = hintId;
+      hint.className = "questions-view__hint";
+      hint.textContent = isLast
+        ? "選択肢を選ぶと「診断する」を押せます。"
+        : "選択肢を選ぶと「次へ」を押せます。";
+      wrapper.appendChild(hint);
+    }
+
+    return wrapper;
   }
 
   /**

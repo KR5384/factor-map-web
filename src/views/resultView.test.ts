@@ -89,6 +89,21 @@ describe("結果画面", () => {
     // 画面の主見出しは h1。タイプの要因には文字の印も付ける (色だけに頼らない)。
     expect(text(root, "h1")).toBe("診断結果");
     expect(root.querySelectorAll(".factor__type-tag")).toHaveLength(2);
+    // オレンジ (タイプの要因) の説明は開いたまま、ほかは畳んで「開く」で見せる。
+    const body = (id: string) => root.querySelector<HTMLElement>(`#factor-body-${id}`)!;
+    expect(body("info_overload").hidden).toBe(false);
+    expect(body("rumination").hidden).toBe(false);
+    const toggles = root.querySelectorAll<HTMLButtonElement>(".factor__toggle");
+    expect(toggles).toHaveLength(3);
+    const toggle = toggles[0]!;
+    const closedBody = root.querySelector<HTMLElement>(`#${toggle.getAttribute("aria-controls")}`)!;
+    expect(closedBody.hidden).toBe(true);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.textContent).toBe("開く");
+    toggle.click();
+    expect(closedBody.hidden).toBe(false);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(toggle.textContent).toBe("閉じる");
     expect(root.querySelector(".moyamoya-map")?.getAttribute("aria-label")).toContain(
       "タイプを決めた要因は 情報過多/認知負荷、反すう/考え続ける状態。"
     );

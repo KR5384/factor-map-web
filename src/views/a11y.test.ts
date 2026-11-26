@@ -84,9 +84,32 @@ describe("質問画面のフォーカス", () => {
 
   it("次へで、新しい設問文 (h1) にフォーカスが移る", () => {
     const c = setup();
+    c.querySelector<HTMLButtonElement>('.questions-view__choice[data-value="2"]')!.click();
     c.querySelector<HTMLButtonElement>(".questions-view__next")!.click();
     expect(document.activeElement?.tagName).toBe("H1");
     expect(document.activeElement?.textContent).toContain("質問2");
+  });
+
+  it("答えるまで「次へ」は押せず、理由の案内が出る", () => {
+    const c = setup();
+    expect(c.querySelector<HTMLButtonElement>(".questions-view__next")!.disabled).toBe(true);
+    expect(c.querySelector(".questions-view__hint")?.textContent).toContain("次へ");
+    c.querySelector<HTMLButtonElement>('.questions-view__choice[data-value="2"]')!.click();
+    expect(c.querySelector<HTMLButtonElement>(".questions-view__next")!.disabled).toBe(false);
+    expect(c.querySelector(".questions-view__hint")).toBeNull();
+  });
+
+  it("「診断する」は最後の質問でだけ出る", () => {
+    const c = setup();
+    expect(c.querySelector(".questions-view__diagnose")).toBeNull();
+    for (let i = 0; i < 19; i++) {
+      c.querySelector<HTMLButtonElement>('.questions-view__choice[data-value="2"]')!.click();
+      c.querySelector<HTMLButtonElement>(".questions-view__next")!.click();
+    }
+    expect(c.querySelector(".questions-view__next")).toBeNull();
+    expect(c.querySelector<HTMLButtonElement>(".questions-view__diagnose")!.disabled).toBe(true);
+    c.querySelector<HTMLButtonElement>('.questions-view__choice[data-value="2"]')!.click();
+    expect(c.querySelector<HTMLButtonElement>(".questions-view__diagnose")!.disabled).toBe(false);
   });
 });
 
