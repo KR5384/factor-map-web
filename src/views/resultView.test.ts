@@ -78,14 +78,18 @@ describe("結果画面", () => {
     expect(root.querySelectorAll(".map-link")).toHaveLength(1);
 
     const entry = typeCatalog.get("03-09")!;
-    expect(text(root, ".result-view__headline-name")).toBe(`『${entry.name}』タイプ`);
+    expect(text(root, ".result-view__headline-lead")).toBe("2つの組み合わせ");
+    expect(text(root, ".result-view__headline-name")).toBe(entry.name);
     expect(text(root, ".result-view__headline-desc")).toBe(entry.description);
-    expect(text(root, ".result-view__headline-basis")).toBe("情報過多/認知負荷 × 反すう/考え続ける状態");
+    // 円には「/」より前の短いラベルと点数を出す。
+    const top = root.querySelector('.bubble[data-factor-id="info_overload"]')!;
+    expect(top.querySelector(".bubble__label")?.textContent).toBe("情報過多");
+    expect(top.querySelector(".bubble__score")?.textContent).toBe("82");
     expect(root.querySelectorAll(".factor-details > li")).toHaveLength(5);
     expect(root.querySelector(".result-view__low")).toBeNull();
   });
 
-  it("3つのタイプは線3本、タイプ名は『名前』", async () => {
+  it("3つのタイプは線3本、「3つの組み合わせ」とタイプ名", async () => {
     const root = await render(
       response([10, 10, 80, 10, 75, 10, 10, 10, 72, 10], {
         circles: ranked([[3, 80], [5, 75], [9, 72]]),
@@ -100,7 +104,8 @@ describe("結果画面", () => {
       })
     );
     expect(root.querySelectorAll(".map-link")).toHaveLength(3);
-    expect(text(root, ".result-view__headline-name")).toBe(`『${typeCatalog.get("03-05-09")!.name}』`);
+    expect(text(root, ".result-view__headline-lead")).toBe("3つの組み合わせ");
+    expect(text(root, ".result-view__headline-name")).toBe(typeCatalog.get("03-05-09")!.name);
   });
 
   it("もやもやが少ない人は「もやもやは少なめです」とタイプ1つ、線なし", async () => {
@@ -114,7 +119,7 @@ describe("結果画面", () => {
       })
     );
     expect(text(root, ".result-view__low")).toBe(LOW_MOYAMOYA_MESSAGE);
-    expect(text(root, ".result-view__headline-name")).toBe(`『${typeCatalog.get("02")!.name}』タイプ`);
+    expect(text(root, ".result-view__headline-name")).toBe(typeCatalog.get("02")!.name);
     expect(root.querySelectorAll(".map-link")).toHaveLength(0);
   });
 

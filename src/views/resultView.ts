@@ -40,7 +40,6 @@ import {
 import type { MapRenderer } from "@/views/mapRenderer";
 import { persistResult } from "@/views/resultReplay";
 import {
-  typeDisplayName,
   typeIdOf,
   type TypeCatalog,
   type TypeEntry,
@@ -222,7 +221,7 @@ function buildFactorDetails(
  * タイプ名の見出しを構築する。
  *
  * タイプの要因 (最大3つ) の組み合わせで決まるタイプ名とひとこと解説を出す。
- * 主役はマップなので、見出しは小さめにとどめる。判定に使った要因名も順位順に添える。
+ * 「Nつの組み合わせ」→ タイプ名 (大きく) → ひとこと解説 の順に並べ、すぐ下のマップにつなげる。
  */
 function buildTypeHeadline(
   typeId: string,
@@ -234,15 +233,17 @@ function buildTypeHeadline(
   box.dataset.typeId = typeId;
   box.dataset.typeSize = String(typeFactors.length);
 
+  // 小見出し: 何個の要因の組み合わせか (例: 「3つの組み合わせ」)。
   const lead = document.createElement("p");
   lead.className = "result-view__headline-lead";
   lead.textContent =
-    typeFactors.length === 1 ? "いちばん大きいのは…" : "あなたのもやもやは…";
+    typeFactors.length <= 1 ? "いちばん大きいもやもや" : `${typeFactors.length}つの組み合わせ`;
   box.appendChild(lead);
 
+  // タイプ名 (括弧なし)。判定に使った要因はマップの線で示すので、ここには並べない。
   const name = document.createElement("p");
   name.className = "result-view__headline-name";
-  name.textContent = typeDisplayName(typeId, entry);
+  name.textContent = entry.name;
   box.appendChild(name);
 
   if (entry.description) {
@@ -251,12 +252,6 @@ function buildTypeHeadline(
     desc.textContent = entry.description;
     box.appendChild(desc);
   }
-
-  // 判定に使った要因 (例: 情報過多/認知負荷 × 反すう/考え続ける状態)。
-  const basis = document.createElement("p");
-  basis.className = "result-view__headline-basis";
-  basis.textContent = typeFactors.map((f) => f.label).join(" × ");
-  box.appendChild(basis);
 
   return box;
 }
